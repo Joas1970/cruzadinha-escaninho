@@ -3,6 +3,39 @@
 Atividades de História e Filosofia com montagem automática, editor de conteúdo,
 conferência, gabarito, teclado virtual e impressão.
 
+## Alunos e professores
+
+O endereço público abre no **modo aluno**, sem Revelar, Gabarito ou Conteúdo.
+Para preparar atividades, abra `/?modo=professor`.
+
+Na área do professor, escolha um tema ou crie uma atividade em **Conteúdo** e
+clique em **Compartilhar atividade**. O painel oferece link para a turma,
+WhatsApp, compartilhamento pelo dispositivo, QR code para baixar e apresentação
+para projetar na sala. O professor pode desativar o botão Conferir no link enviado.
+
+Os temas usam `?modo=aluno&tema=grecia`. As atividades personalizadas são
+comprimidas no fragmento `#atividade=...` do link, sem enviar as tentativas do
+professor. Não é necessário cadastro ou banco de dados. Preserve o link completo;
+editar a atividade depois não altera os links já enviados.
+
+Tentativas de alunos e professores ficam separadas no armazenamento local.
+Os modos organizam a interface; não são autenticação e não mantêm respostas em
+sigilo contra inspeção técnica. A área do professor é um endereço de preparação,
+não um painel administrativo protegido.
+
+## Incorporação no Escaninho Digital
+
+A página `/atividades/cruzadinha/` no repositório `escaninho-digital` incorpora
+a aplicação da Vercel em modo aluno e aparece na coleção **Atividades e jogos**.
+O link para abrir em tela inteira é uma alternativa para navegadores que bloqueiam
+armazenamento em páginas incorporadas.
+
+Para outros sites, abra **Compartilhar atividade → Incorporar em uma página do site**
+e copie o código. O `iframe` inclui um título acessível; `public/embed.js` ajusta
+a altura somente para mensagens provenientes da janela e origem esperadas.
+Links extensos continuam disponíveis para copiar, mas o QR code é desativado
+quando excede o limite definido para leitura. Encurte dicas para gerar um QR legível.
+
 ## Executar
 
 Use Node.js 22.18 ou superior e npm:

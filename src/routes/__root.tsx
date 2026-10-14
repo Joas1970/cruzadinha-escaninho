@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Palavras Cruzadas";
+const APP_NAME = "Palavras Cruzadas · Escaninho Digital";
 
 export const Route = createRootRoute({
   head: () => ({

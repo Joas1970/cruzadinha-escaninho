@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { BookOpen, Check, Eraser, Eye, PenLine, Printer } from "lucide-react";
 import { CUSTOM_ID, PUZZLES } from "@/data/puzzles";
 import {
@@ -13,6 +22,11 @@ import {
 } from "@/lib/crossword/engine";
 
 import { parseSave, writeSave, STORAGE_KEY, type Save } from "@/lib/crossword/storage";
+import { readActivityLocation, type ActivityLocation } from "@/lib/crossword/sharing";
+import { EmbedBridge } from "./embed-bridge";
+const ShareDialog = lazy(() =>
+  import("./share-dialog").then((module) => ({ default: module.ShareDialog })),
+);
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type Active = { row: number; col: number; dir: Direction };
@@ -26,7 +40,9 @@ function cellKey(row: number, col: number) {
 }
 
 function signature(model: PuzzleModel) {
-  return model.words.map((word) => `${word.direction}:${word.row},${word.col}:${word.answer}`).join("|");
+  return model.words
+    .map((word) => `${word.direction}:${word.row},${word.col}:${word.answer}`)
+    .join("|");
 }
 
 function readSave(): Save | null {
@@ -39,7 +55,11 @@ function readSave(): Save | null {
   }
 }
 
-function wordCellsMatch(word: PlacedWord, fills: Record<string, string>, expect: "full" | "correct") {
+function wordCellsMatch(
+  word: PlacedWord,
+  fills: Record<string, string>,
+  expect: "full" | "correct",
+) {
   return cellsOf(word).every((cell, index) => {
     const value = fills[cellKey(cell.row, cell.col)] ?? "";
     if (expect === "full") return value.length === 1;
@@ -52,6 +72,13 @@ export function CrosswordPlay() {
   const [customSource, setCustomSource] = useState("");
   const [progress, setProgress] = useState<Record<string, Record<string, string>>>({});
   const [hydrated, setHydrated] = useState(false);
+  const [location, setLocation] = useState<ActivityLocation | null>(null);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [sharedSource, setSharedSource] = useState("");
+  const [activityError, setActivityError] = useState("");
+  const appRoot = useRef<HTMLDivElement | null>(null);
+  const teacher = location?.teacher === true;
+  const canCheck = teacher || location?.canCheck !== false;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(builtIns[0]!.source);
   const [checked, setChecked] = useState(false);
@@ -61,18 +88,26 @@ export function CrosswordPlay() {
   const [storageWarning, setStorageWarning] = useState("");
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const [active, setActive] = useState<Active | null>(() => {
-    const first = builtIns[0]!.model.words.find((word) => word.direction === "across") ?? builtIns[0]!.model.words[0];
+    const first =
+      builtIns[0]!.model.words.find((word) => word.direction === "across") ??
+      builtIns[0]!.model.words[0];
     return first ? { row: first.row, col: first.col, dir: first.direction } : null;
   });
   const activeRef = useRef<HTMLButtonElement | null>(null);
   const wantFocus = useRef(false);
   const skipReset = useRef(true);
 
-  const customModel = useMemo(() => (customSource.trim() ? buildPuzzle(customSource) : null), [customSource]);
-  const selected = puzzleId === CUSTOM_ID ? null : builtIns.find((puzzle) => puzzle.id === puzzleId);
-  const source = selected?.source ?? customSource;
+  const contentSource = sharedSource || customSource;
+  const customModel = useMemo(
+    () => (contentSource.trim() ? buildPuzzle(contentSource) : null),
+    [contentSource],
+  );
+  const selected =
+    puzzleId === CUSTOM_ID ? null : builtIns.find((puzzle) => puzzle.id === puzzleId);
+  const source = selected?.source ?? contentSource;
   const model = selected?.model ?? customModel ?? builtIns[0]!.model;
-  const sig = signature(model);
+  // Keep students' attempts separate from the teacher's answers on a shared device.
+  const sig = `${teacher ? "professor:" : "aluno:"}${signature(model)}`;
   const fills = progress[sig] ?? {};
   const helped = helpHistory[sig] === true;
   const matrix = useMemo(() => puzzleMatrix(model), [model]);
@@ -88,28 +123,85 @@ export function CrosswordPlay() {
     : undefined;
 
   useEffect(() => {
-    const saved = readSave();
-    if (saved) {
-      setPuzzleId(saved.puzzleId === CUSTOM_ID || builtIns.some((puzzle) => puzzle.id === saved.puzzleId) ? saved.puzzleId : builtIns[0]!.id);
-      setCustomSource(saved.customSource);
-      setProgress(saved.progress);
-      setHelpHistory(saved.helped);
-      if (saved.puzzleId === CUSTOM_ID && saved.customSource.trim()) {
-        setDraft(saved.customSource);
+    const restoreActivity = () => {
+      const saved = readSave();
+      const incoming = readActivityLocation(window.location.href);
+      setLocation(incoming);
+      setBaseUrl(window.location.origin + window.location.pathname);
+      setActivityError(incoming.error || "");
+      setSharedSource("");
+      setPuzzleId(builtIns[0]!.id);
+      setEditing(false);
+      setChecked(false);
+      setRevealAll(false);
+      setRevealed({});
+      if (saved) {
+        setCustomSource(saved.customSource);
+        // Migrate previous attempts into the teacher namespace only.
+        const migrate = <T,>(values: Record<string, T>) =>
+          Object.fromEntries(
+            Object.entries(values).map(([key, value]) => [
+              key.startsWith("professor:") || key.startsWith("aluno:") ? key : `professor:${key}`,
+              value,
+            ]),
+          );
+        setProgress(migrate(saved.progress));
+        setHelpHistory(migrate(saved.helped));
+        if (incoming.teacher && !incoming.puzzleId) {
+          setPuzzleId(
+            saved.puzzleId === CUSTOM_ID || builtIns.some((puzzle) => puzzle.id === saved.puzzleId)
+              ? saved.puzzleId
+              : builtIns[0]!.id,
+          );
+        }
+        if (incoming.teacher && saved.puzzleId === CUSTOM_ID && saved.customSource.trim()) {
+          setDraft(saved.customSource);
+        }
       }
-    }
-    setHydrated(true);
+      if (incoming.puzzleId) setPuzzleId(incoming.puzzleId);
+      if (incoming.source) {
+        const shared = buildPuzzle(incoming.source);
+        if (shared.words.length === 0 || shared.issues.length > 0 || shared.omitted.length > 0) {
+          setActivityError(
+            "A atividade deste link contém palavras inválidas ou sem encaixe. Peça ao professor um novo link.",
+          );
+        } else {
+          setSharedSource(incoming.source);
+          setPuzzleId(CUSTOM_ID);
+        }
+      }
+      setHydrated(true);
+    };
+    restoreActivity();
+    window.addEventListener("hashchange", restoreActivity);
+    window.addEventListener("popstate", restoreActivity);
+    return () => {
+      window.removeEventListener("hashchange", restoreActivity);
+      window.removeEventListener("popstate", restoreActivity);
+    };
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    const payload: Save = { puzzleId, customSource, progress, helped: helpHistory };
+    const previous = readSave();
+    const payload: Save = {
+      puzzleId: teacher ? puzzleId : (previous?.puzzleId ?? builtIns[0]!.id),
+      customSource,
+      progress,
+      helped: helpHistory,
+    };
     try {
-      setStorageWarning(writeSave(localStorage, payload) ? "" : "Não foi possível salvar neste navegador. Mantenha esta página aberta para preservar sua tentativa.");
+      setStorageWarning(
+        writeSave(localStorage, payload)
+          ? ""
+          : "Não foi possível salvar neste navegador. Mantenha esta página aberta para preservar sua tentativa.",
+      );
     } catch {
-      setStorageWarning("O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.");
+      setStorageWarning(
+        "O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.",
+      );
     }
-  }, [hydrated, puzzleId, customSource, progress, helpHistory]);
+  }, [hydrated, puzzleId, customSource, progress, helpHistory, teacher]);
 
   useEffect(() => {
     if (skipReset.current) {
@@ -131,7 +223,9 @@ export function CrosswordPlay() {
 
   const solved =
     model.words.length > 0 && model.words.every((word) => wordCellsMatch(word, fills, "correct"));
-  const filledWords = model.words.filter((word) => wordCellsMatch(word, fills, "correct")).length;
+  const filledWords = model.words.filter((word) =>
+    wordCellsMatch(word, fills, canCheck ? "correct" : "full"),
+  ).length;
 
   function focusWord(word: PlacedWord) {
     const cells = cellsOf(word);
@@ -149,7 +243,13 @@ export function CrosswordPlay() {
     if (!cell) return;
     const preferred: Direction = rowDelta !== 0 ? "down" : "across";
     const dir =
-      preferred === "across" && cell.acrossId ? "across" : preferred === "down" && cell.downId ? "down" : cell.acrossId ? "across" : "down";
+      preferred === "across" && cell.acrossId
+        ? "across"
+        : preferred === "down" && cell.downId
+          ? "down"
+          : cell.acrossId
+            ? "across"
+            : "down";
     wantFocus.current = true;
     setActive({ row, col, dir });
   }
@@ -255,12 +355,13 @@ export function CrosswordPlay() {
   }
 
   function revealWord() {
-    if (!current) return;
+    if (!teacher || !current) return;
     setHelpHistory((prev) => ({ ...prev, [sig]: true }));
     setRevealed((prev) => ({ ...prev, [current.id]: true }));
   }
 
   function openGabarito() {
+    if (!teacher) return;
     setHelpHistory((prev) => ({ ...prev, [sig]: true }));
     setRevealAll(true);
     setChecked(true);
@@ -275,11 +376,13 @@ export function CrosswordPlay() {
   }
 
   function openEditor() {
+    if (!teacher) return;
     setDraft(source || builtIns[0]!.source);
     setEditing(true);
   }
 
   function applyDraft() {
+    if (!teacher) return;
     const next = buildPuzzle(draft);
     if (next.words.length === 0 || next.issues.length > 0 || next.omitted.length > 0) return;
     setCustomSource(draft);
@@ -297,49 +400,86 @@ export function CrosswordPlay() {
     window.print();
   }
 
-  const draftModel = useMemo(() => editing ? buildPuzzle(draft) : null, [editing, draft]);
+  const draftModel = useMemo(() => (editing ? buildPuzzle(draft) : null), [editing, draft]);
 
   useEffect(() => {
     if (editing) editorRef.current?.focus();
   }, [editing]);
   const chips = [
     ...builtIns.map((puzzle) => ({ id: puzzle.id, label: puzzle.model.title })),
-    ...(customSource.trim() ? [{ id: CUSTOM_ID, label: customModel?.title || "Meu texto" }] : []),
+    ...(teacher && customSource.trim()
+      ? [{ id: CUSTOM_ID, label: customModel?.title || "Meu texto" }]
+      : []),
   ];
 
+  if (!hydrated)
+    return (
+      <main className="mx-auto max-w-6xl p-6" aria-busy="true">
+        <h1 className="font-display text-3xl">Palavras Cruzadas</h1>
+        <p role="status" className="mt-3">
+          Preparando sua atividade…
+        </p>
+      </main>
+    );
+  if (activityError)
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <h1 className="font-display text-3xl">Atividade indisponível</h1>
+        <p role="alert" className="mt-4">
+          {activityError}
+        </p>
+        <a className="tool-button mt-6" href="/?modo=aluno">
+          Ver as atividades disponíveis
+        </a>
+      </main>
+    );
+
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div ref={appRoot} className={`${location?.embedded ? "" : "min-h-screen"} bg-paper text-ink`}>
+      <EmbedBridge enabled={location?.embedded === true} root={appRoot} />
       <div className="h-1 bg-brass" />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-xl">
-            <p className="text-xs font-semibold tracking-widest text-brass-deep uppercase">História e Filosofia</p>
+            <p className="text-xs font-semibold tracking-widest text-brass-deep uppercase">
+              Escaninho Digital · {teacher ? "Área do professor" : "Atividade do aluno"}
+            </p>
             <h1 className="mt-1 font-display text-4xl font-medium text-ink">Palavras Cruzadas</h1>
             <p className="mt-2 text-pretty text-ink-soft">
-              Escolha uma casa, leia a dica e escreva. Para outro assunto, abra Conteúdo e troque a lista.
+              {teacher
+                ? "Prepare o conteúdo e compartilhe a atividade com sua turma."
+                : "Escolha uma casa, leia a dica e escreva. Seu progresso é salvo neste navegador."}
             </p>
           </div>
           <div className="no-print flex flex-wrap gap-2">
-            <ToolButton onClick={() => setChecked(true)} tone="primary">
-              <Check className="size-4" aria-hidden />
-              Conferir
-            </ToolButton>
-            <ToolButton onClick={revealWord} disabled={!current || revealAll}>
-              <Eye className="size-4" aria-hidden />
-              Revelar
-            </ToolButton>
-            <ToolButton onClick={openGabarito}>
-              <BookOpen className="size-4" aria-hidden />
-              Gabarito
-            </ToolButton>
+            {canCheck ? (
+              <ToolButton onClick={() => setChecked(true)} tone="primary">
+                <Check className="size-4" aria-hidden />
+                Conferir
+              </ToolButton>
+            ) : null}
+            {teacher ? (
+              <ToolButton onClick={revealWord} disabled={!current || revealAll}>
+                <Eye className="size-4" aria-hidden />
+                Revelar
+              </ToolButton>
+            ) : null}
+            {teacher ? (
+              <ToolButton onClick={openGabarito}>
+                <BookOpen className="size-4" aria-hidden />
+                Gabarito
+              </ToolButton>
+            ) : null}
             <ToolButton onClick={clearBoard}>
               <Eraser className="size-4" aria-hidden />
               Limpar
             </ToolButton>
-            <ToolButton onClick={openEditor}>
-              <PenLine className="size-4" aria-hidden />
-              Conteúdo
-            </ToolButton>
+            {teacher ? (
+              <ToolButton onClick={openEditor}>
+                <PenLine className="size-4" aria-hidden />
+                Conteúdo
+              </ToolButton>
+            ) : null}
             <ToolButton onClick={() => printSheet(false)}>
               <Printer className="size-4" aria-hidden />
               Imprimir
@@ -347,30 +487,58 @@ export function CrosswordPlay() {
           </div>
         </header>
 
-        <div className="no-print flex min-w-0 gap-2 overflow-x-auto pb-1">
-          {chips.map((chip) => {
-            const on = chip.id === puzzleId && !editing;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => {
-                  setPuzzleId(chip.id);
-                  setEditing(false);
-                }}
-                className={
-                  on
-                    ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
-                    : "h-11 shrink-0 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink"
-                }
-              >
-                {chip.label}
-              </button>
-            );
-          })}
-        </div>
+        {teacher && !editing ? (
+          <div className="no-print flex flex-wrap items-center justify-between gap-3 border-y border-line py-4">
+            <p className="text-sm text-ink-soft">
+              Os links da turma abrem sem ferramentas de professor.
+            </p>
+            <Suspense
+              fallback={
+                <span role="status" className="text-sm">
+                  Preparando compartilhamento…
+                </span>
+              }
+            >
+              <ShareDialog
+                baseUrl={baseUrl}
+                puzzleId={puzzleId}
+                source={source}
+                title={model.title}
+              />
+            </Suspense>
+          </div>
+        ) : null}
 
-        {storageWarning ? <p role="status" className="no-print text-sm text-miss">{storageWarning}</p> : null}
+        {!sharedSource && (!location?.puzzleId || teacher) ? (
+          <div className="no-print flex min-w-0 gap-2 overflow-x-auto pb-1">
+            {chips.map((chip) => {
+              const on = chip.id === puzzleId && !editing;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => {
+                    setPuzzleId(chip.id);
+                    setEditing(false);
+                  }}
+                  className={
+                    on
+                      ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
+                      : "h-11 shrink-0 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink"
+                  }
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {storageWarning ? (
+          <p role="status" className="no-print text-sm text-miss">
+            {storageWarning}
+          </p>
+        ) : null}
 
         {editing ? (
           <Editor
@@ -394,24 +562,41 @@ export function CrosswordPlay() {
                   {filledWords} de {model.words.length}
                 </p>
               </div>
-              {model.note ? <p className="mt-1 text-pretty text-sm text-ink-soft">{model.note}</p> : null}
+              {model.note ? (
+                <p className="mt-1 text-pretty text-sm text-ink-soft">{model.note}</p>
+              ) : null}
               <div className="mt-3 h-1 bg-line">
                 <div
                   className="h-1 bg-brass"
-                  style={{ width: model.words.length ? `${Math.round((filledWords / model.words.length) * 100)}%` : "0%" }}
+                  style={{
+                    width: model.words.length
+                      ? `${Math.round((filledWords / model.words.length) * 100)}%`
+                      : "0%",
+                  }}
                 />
               </div>
 
               {solved ? (
-                <p role="status" className="no-print mt-4 bg-ink px-4 py-3 font-display text-lg text-paper">
-                  {helped ? "Grade fechada, com alguma ajuda no caminho." : "Cruzadinha completa, sem o gabarito."}
+                <p
+                  role="status"
+                  className="no-print mt-4 bg-ink px-4 py-3 font-display text-lg text-paper"
+                >
+                  {!teacher
+                    ? "Cruzadinha completa. Muito bem!"
+                    : helped
+                      ? "Grade fechada, com alguma ajuda no caminho."
+                      : "Cruzadinha completa, sem o gabarito."}
                 </p>
               ) : null}
 
               {revealAll ? (
                 <p className="no-print mt-4 flex items-center justify-between gap-3 bg-paper-deep px-4 py-3 text-sm">
                   <span>Gabarito aberto. As letras não entram na sua tentativa.</span>
-                  <button type="button" className="font-semibold text-brass-deep" onClick={() => setRevealAll(false)}>
+                  <button
+                    type="button"
+                    className="font-semibold text-brass-deep"
+                    onClick={() => setRevealAll(false)}
+                  >
                     Fechar
                   </button>
                 </p>
@@ -419,7 +604,8 @@ export function CrosswordPlay() {
 
               {model.omitted.length > 0 ? (
                 <p className="mt-4 text-sm text-miss">
-                  Sem encaixe: {model.omitted.map((item) => item.answer).join(", ")}. Mude uma letra em comum ou trave a posição.
+                  Sem encaixe: {model.omitted.map((item) => item.answer).join(", ")}. Mude uma letra
+                  em comum ou trave a posição.
                 </p>
               ) : null}
 
@@ -434,7 +620,9 @@ export function CrosswordPlay() {
                 )}
               </p>
               <p className="sr-only" aria-live="polite">
-                {current ? `${current.direction === "across" ? "Horizontal" : "Vertical"} ${current.number}. ${current.clue}` : ""}
+                {current
+                  ? `${current.direction === "across" ? "Horizontal" : "Vertical"} ${current.number}. ${current.clue}`
+                  : ""}
               </p>
 
               <div
@@ -446,16 +634,31 @@ export function CrosswordPlay() {
               >
                 {matrix.map((row, rowIndex) =>
                   row.map((cell, colIndex) => {
-                    if (!cell) return <div key={cellKey(rowIndex, colIndex)} className="blocked-cell aspect-square bg-ink" aria-hidden="true" />;
+                    if (!cell)
+                      return (
+                        <div
+                          key={cellKey(rowIndex, colIndex)}
+                          className="blocked-cell aspect-square bg-ink"
+                          aria-hidden="true"
+                        />
+                      );
                     const on = active?.row === rowIndex && active?.col === colIndex;
                     const inWord = Boolean(
                       current &&
-                        ((current.direction === "across" && cell.acrossId === current.id) ||
-                          (current.direction === "down" && cell.downId === current.id)),
+                      ((current.direction === "across" && cell.acrossId === current.id) ||
+                        (current.direction === "down" && cell.downId === current.id)),
                     );
                     const shown = shownLetter(cell, rowIndex, colIndex, fills, revealed, revealAll);
                     const mark = cellMark(shown, cell.letter, checked, revealAll, revealed, cell);
-                    const state = on ? "on" : mark === "bad" ? "bad" : mark === "ok" ? "ok" : inWord ? "word" : "idle";
+                    const state = on
+                      ? "on"
+                      : mark === "bad"
+                        ? "bad"
+                        : mark === "ok"
+                          ? "ok"
+                          : inWord
+                            ? "word"
+                            : "idle";
                     return (
                       <button
                         key={cellKey(rowIndex, colIndex)}
@@ -477,7 +680,10 @@ export function CrosswordPlay() {
                 )}
               </div>
 
-              <p id="grid-instructions" className="no-print mt-2 text-sm text-ink-soft">Setas movem. Letras escrevem. Backspace apaga. Enter troca de palavra; Shift+Enter volta. Tab sai da grade. Clique novamente num cruzamento para mudar a direção.</p>
+              <p id="grid-instructions" className="no-print mt-2 text-sm text-ink-soft">
+                Setas movem. Letras escrevem. Backspace apaga. Enter troca de palavra; Shift+Enter
+                volta. Tab sai da grade. Clique novamente num cruzamento para mudar a direção.
+              </p>
 
               <div className="no-print mt-3 grid grid-cols-9 gap-1 md:hidden">
                 {LETTERS.map((letter) => (
@@ -501,7 +707,11 @@ export function CrosswordPlay() {
                 </button>
               </div>
 
-              <button type="button" className="no-print mt-3 text-sm font-semibold text-brass-deep" onClick={() => printSheet(true)}>
+              <button
+                type="button"
+                className="no-print mt-3 text-sm font-semibold text-brass-deep"
+                onClick={() => printSheet(true)}
+              >
                 Imprimir folha em branco
               </button>
             </section>
@@ -512,6 +722,7 @@ export function CrosswordPlay() {
                 words={across}
                 currentId={current?.id}
                 fills={fills}
+                canCheck={canCheck}
                 checked={checked}
                 revealed={revealed}
                 revealAll={revealAll}
@@ -522,6 +733,7 @@ export function CrosswordPlay() {
                 words={down}
                 currentId={current?.id}
                 fills={fills}
+                canCheck={canCheck}
                 checked={checked}
                 revealed={revealed}
                 revealAll={revealAll}
@@ -545,7 +757,8 @@ function shownLetter(
 ) {
   const acrossId = cell.acrossId;
   const downId = cell.downId;
-  if (revealAll || (acrossId && revealed[acrossId]) || (downId && revealed[downId])) return cell.letter;
+  if (revealAll || (acrossId && revealed[acrossId]) || (downId && revealed[downId]))
+    return cell.letter;
   return fills[cellKey(row, col)] ?? "";
 }
 
@@ -570,6 +783,7 @@ function cellMark(
 function wordTone(
   word: PlacedWord,
   fills: Record<string, string>,
+  canCheck: boolean,
   checked: boolean,
   revealed: Record<string, boolean>,
   revealAll: boolean,
@@ -577,6 +791,8 @@ function wordTone(
   if (revealAll || revealed[word.id]) return "shown";
   const cells = cellsOf(word);
   const values = cells.map((cell) => fills[cellKey(cell.row, cell.col)] ?? "");
+  if (!canCheck)
+    return values.every(Boolean) ? "filled" : values.some(Boolean) ? "partial" : "empty";
   if (values.every((value, index) => value === word.answer[index])) return "done";
   if (checked && values.some((value, index) => value && value !== word.answer[index])) return "bad";
   if (values.some(Boolean)) return "partial";
@@ -588,6 +804,7 @@ function ClueColumn({
   words,
   currentId,
   fills,
+  canCheck,
   checked,
   revealed,
   revealAll,
@@ -597,6 +814,7 @@ function ClueColumn({
   words: PlacedWord[];
   currentId?: string;
   fills: Record<string, string>;
+  canCheck: boolean;
   checked: boolean;
   revealed: Record<string, boolean>;
   revealAll: boolean;
@@ -607,7 +825,7 @@ function ClueColumn({
       <h2 className="font-display text-xl">{title}</h2>
       <ul className="mt-3 grid gap-2">
         {words.map((word) => {
-          const tone = wordTone(word, fills, checked, revealed, revealAll);
+          const tone = wordTone(word, fills, canCheck, checked, revealed, revealAll);
           const on = word.id === currentId;
           return (
             <li key={word.id}>
@@ -621,11 +839,22 @@ function ClueColumn({
                     : "w-full border-l-4 border-transparent px-3 py-3 text-left hover:bg-paper-deep"
                 }
               >
-                <span className="text-sm font-semibold text-brass-deep tabular-nums">{word.number}. </span>
+                <span className="text-sm font-semibold text-brass-deep tabular-nums">
+                  {word.number}.{" "}
+                </span>
                 <span className="text-pretty">{word.clue}</span>
-                {tone === "done" ? <span className="ml-2 text-sm font-semibold text-brass-deep">certa</span> : null}
-                {tone === "bad" ? <span className="ml-2 text-sm font-semibold text-miss">rever</span> : null}
-                {tone === "shown" ? <span className="ml-2 text-sm font-semibold text-ink-soft">gabarito</span> : null}
+                {tone === "done" ? (
+                  <span className="ml-2 text-sm font-semibold text-brass-deep">certa</span>
+                ) : null}
+                {tone === "filled" ? (
+                  <span className="ml-2 text-sm text-ink-soft">preenchida</span>
+                ) : null}
+                {tone === "bad" ? (
+                  <span className="ml-2 text-sm font-semibold text-miss">rever</span>
+                ) : null}
+                {tone === "shown" ? (
+                  <span className="ml-2 text-sm font-semibold text-ink-soft">gabarito</span>
+                ) : null}
               </button>
             </li>
           );
@@ -686,7 +915,8 @@ function Editor({
       <div className="max-w-3xl">
         <h2 className="font-display text-2xl">Conteúdo da cruzadinha</h2>
         <p className="mt-2 text-pretty text-ink-soft">
-          Uma resposta por linha. A grade é montada de novo a partir dessa lista. Acentos não entram nas casas: Razão vira RAZAO.
+          Uma resposta por linha. A grade é montada de novo a partir dessa lista. Acentos não entram
+          nas casas: Razão vira RAZAO.
         </p>
         <pre className="mt-3 max-w-full overflow-x-auto bg-paper-deep p-4 text-sm text-ink">{`PALAVRA | Dica que o aluno lê
 OUTRA | Segunda dica
@@ -726,18 +956,26 @@ AMOR | afeto | 1,2,V`}</pre>
         aria-label="Lista de palavras e dicas"
       />
       <div id="editor-feedback" role="status">
-      {issues.length > 0 ? (
-        <ul className="grid gap-1 text-sm text-miss">
-          {issues.map((issue) => (
-            <li key={`${issue.line}-${issue.answer}`}>
-              {issue.line > 0 ? `Linha ${issue.line}: ` : "Posicionamento: "} {issue.answer ? `${issue.answer} — ` : ""}
-              {issue.message}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {model.omitted.length > 0 ? <p className="text-sm text-miss">Sem encaixe: {model.omitted.map((word) => word.answer).join(", ")}. Ajuste as palavras ou posições antes de montar.</p> : null}
-      <p className="text-sm text-ink-soft">Prévia: {model.words.length} palavras, {model.rows} linhas e {model.cols} colunas.</p>
+        {issues.length > 0 ? (
+          <ul className="grid gap-1 text-sm text-miss">
+            {issues.map((issue) => (
+              <li key={`${issue.line}-${issue.answer}`}>
+                {issue.line > 0 ? `Linha ${issue.line}: ` : "Posicionamento: "}{" "}
+                {issue.answer ? `${issue.answer} — ` : ""}
+                {issue.message}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {model.omitted.length > 0 ? (
+          <p className="text-sm text-miss">
+            Sem encaixe: {model.omitted.map((word) => word.answer).join(", ")}. Ajuste as palavras
+            ou posições antes de montar.
+          </p>
+        ) : null}
+        <p className="text-sm text-ink-soft">
+          Prévia: {model.words.length} palavras, {model.rows} linhas e {model.cols} colunas.
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <ToolButton onClick={onApply} tone="primary" disabled={blocked}>
@@ -745,7 +983,11 @@ AMOR | afeto | 1,2,V`}</pre>
         </ToolButton>
         <ToolButton onClick={onCancel}>Voltar</ToolButton>
       </div>
-      {blocked ? <p className="text-sm text-ink-soft">Corrija os avisos e inclua ao menos uma palavra válida para montar a grade.</p> : null}
+      {blocked ? (
+        <p className="text-sm text-ink-soft">
+          Corrija os avisos e inclua ao menos uma palavra válida para montar a grade.
+        </p>
+      ) : null}
     </section>
   );
 }
