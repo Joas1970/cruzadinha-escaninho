@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Palavras Cruzadas",
+      "hasCanvas": false,
+      "bodyTextLen": 1278,
+      "bodyTextHash": "3a0e451cbc773b1dd4d60213af76e111ce4a8708064e445edbc48ae885fceac9",
+      "bodyTextPrefix": "HISTÓRIA E FILOSOFIA Palavras Cruzadas Escolha uma casa, leia a ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Palavras Cruzadas",
+      "hasCanvas": false,
+      "bodyTextLen": 1337,
+      "bodyTextHash": "70f6dae26c76b80c3e105a4d681e8826517a4fd8fb9591685581f2a3df64dd9e",
+      "bodyTextPrefix": "HISTÓRIA E FILOSOFIA Palavras Cruzadas Escolha uma casa, leia a ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

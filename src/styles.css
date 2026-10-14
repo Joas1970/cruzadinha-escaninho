@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --color-paper: #f6f1e7;
+  --color-paper-deep: #efe4d4;
+  --color-ink: #2a2622;
+  --color-ink-soft: #5e584e;
+  --color-brass: #a89060;
+  --color-brass-deep: #6f5a34;
+  --color-line: #e3d7c4;
+  --color-miss: #8c3d32;
+  --color-miss-soft: #f4e6e1;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+}
+
+.sq {
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.sq-letter {
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 4.6vw, 1.5rem);
+  font-weight: 560;
+  line-height: 1;
+}
+
+.sq-num {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--color-ink-soft);
+}
+
+.sq:focus-visible {
+  outline: 2px solid var(--color-brass-deep);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-brass-deep);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sq {
+    transition: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .activity-layout { display: block; }
+  .activity-layout > section { margin-bottom: 1cm; }
+  .sq { background: white !important; color: black !important; border: 1px solid black; }
+  .blocked-cell { background: black !important; print-color-adjust: exact; }
+  .sq-num { color: black; }
+  .sq-letter { font-size: 14pt; }
+  .activity-layout li { break-inside: avoid; }
+  .activity-layout li button { background: white !important; border-color: transparent !important; color: black !important; }
+
+  .sheet {
+    break-inside: avoid;
+  }
+
+  body[data-print="blank"] .sq-letter {
+    color: transparent !important;
+  }
+}
