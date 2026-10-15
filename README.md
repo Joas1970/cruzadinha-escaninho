@@ -1,4 +1,15 @@
-# Palavras Cruzadas
+# Cruzadinha Professor Joás
+
+Nome do projeto: `cruzadinha-professorjoas`.
+
+Endereço personalizado planejado: `https://cruzadinha.professorjoas.com.br`.
+A ativação depende da associação do subdomínio na Vercel e do registro DNS na
+Netlify. Veja o roteiro em [DOMINIO.md](./DOMINIO.md).
+
+A integração atual do Escaninho Digital e o endereço
+`https://cruzadinha-escaninho.vercel.app` continuam usando o mesmo aplicativo.
+O repositório GitHub e o nome do projeto de hospedagem permanecem como estão
+para preservar as conexões existentes durante a ativação do domínio.
 
 Atividades de História e Filosofia com montagem automática, editor de conteúdo,
 conferência, gabarito, teclado virtual e impressão.

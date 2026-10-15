@@ -6,7 +6,7 @@ import { activityUrl, readActivityLocation } from "../src/lib/crossword/sharing.
 const url = process.argv[2] || "http://127.0.0.1:8080/";
 if (
   !/^http:\/\/127\.0\.0\.1:808[01]\/$/.test(url) &&
-  url !== "https://cruzadinha-escaninho.vercel.app/"
+  !["https://cruzadinha-escaninho.vercel.app/", "https://cruzadinha.professorjoas.com.br/"].includes(url)
 )
   throw new Error("Use o servidor local ou o domínio publicado da atividade");
 mkdirSync("screenshots", { recursive: true });

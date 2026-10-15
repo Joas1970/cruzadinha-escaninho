@@ -10,7 +10,7 @@ import {
 } from "./sharing.ts";
 import { buildPuzzle } from "./engine.ts";
 
-const base = "https://cruzadinha-escaninho.vercel.app/";
+const base = "https://cruzadinha.professorjoas.com.br/";
 const source = "# Ação e razão\nCASA | Lugar de morar | 1,1,H\nAMOR | Afeto | 1,2,V";
 
 test("o acesso público é aluno; a incorporação sempre desativa o modo professor", () => {
