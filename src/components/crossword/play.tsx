@@ -441,6 +441,14 @@ export function CrosswordPlay() {
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-xl">
+            <img
+              src="/capa-cruzadinha.webp"
+              alt="Cruzadinha em papel com as palavras História, Conhecimento, Filosofia e Aprendizagem e um lápis."
+              width={2752}
+              height={1536}
+              fetchPriority="high"
+              className="no-print mb-4 block h-auto w-full max-w-sm rounded-lg"
+            />
             <p className="text-xs font-semibold tracking-widest text-brass-deep uppercase">
               Escaninho Digital · {teacher ? "Área do professor" : "Atividade do aluno"}
             </p>
