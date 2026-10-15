@@ -497,9 +497,15 @@ export function CrosswordPlay() {
 
         {teacher && !editing ? (
           <div className="no-print flex flex-wrap items-center justify-between gap-3 border-y border-line py-4">
-            <p className="text-sm text-ink-soft">
-              Os links da turma abrem sem ferramentas de professor.
-            </p>
+            <div className="max-w-xl text-sm text-ink-soft">
+              <h2 className="mb-2 font-semibold text-ink">Prepare e envie sua atividade</h2>
+              <ol className="list-inside list-decimal space-y-1">
+                <li>Abra <strong>Conteúdo</strong> para editar as palavras e dicas.</li>
+                <li>Clique em <strong>Montar grade</strong> para aplicar sua lista.</li>
+                <li>Use <strong>Compartilhar atividade</strong>: link, WhatsApp, QR code e apresentação.</li>
+              </ol>
+              <p className="mt-2">Os alunos recebem a atividade sem Revelar, Gabarito ou editor.</p>
+            </div>
             <Suspense
               fallback={
                 <span role="status" className="text-sm">
