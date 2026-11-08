@@ -492,6 +492,12 @@ export function CrosswordPlay() {
               <Printer className="size-4" aria-hidden />
               Imprimir
             </ToolButton>
+            {!teacher && !location?.embedded ? (
+              <a className="tool-button bg-ink text-paper" href="/?modo=professor">
+                <PenLine className="size-4" aria-hidden />
+                Sou professor · Criar atividade
+              </a>
+            ) : null}
           </div>
         </header>
 
