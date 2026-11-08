@@ -530,28 +530,33 @@ export function CrosswordPlay() {
         ) : null}
 
         {!sharedSource && (!location?.puzzleId || teacher) ? (
-          <div className="no-print flex min-w-0 gap-2 overflow-x-auto pb-1">
-            {chips.map((chip) => {
-              const on = chip.id === puzzleId && !editing;
-              return (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => {
-                    setPuzzleId(chip.id);
-                    setEditing(false);
-                  }}
-                  className={
-                    on
-                      ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
-                      : "h-11 shrink-0 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink"
-                  }
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
+          <section className="no-print grid gap-3" aria-labelledby="activity-gallery-title">
+            <h2 id="activity-gallery-title" className="font-display text-2xl">
+              Galeria de atividades
+            </h2>
+            <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+              {chips.map((chip) => {
+                const on = chip.id === puzzleId && !editing;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setPuzzleId(chip.id);
+                      setEditing(false);
+                    }}
+                    className={
+                      on
+                        ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
+                        : "h-11 shrink-0 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink"
+                    }
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         ) : null}
 
         {storageWarning ? (

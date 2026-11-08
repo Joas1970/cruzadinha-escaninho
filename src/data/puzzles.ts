@@ -73,6 +73,25 @@ BALCANICA | Região cuja crise ajudou a detonar o conflito
 GUERRA | Nome do enfrentamento que durou mais de quatro anos
 `,
   },
+  {
+    id: "teorias-raciais",
+    source: `# Teorias Raciais e Imperialismo Europeu
+# Século XIX. As ideias de superioridade racial e a expansão do domínio europeu na África e na Ásia.
+
+IMPERIALISMO | Política de expansão e domínio econômico e político de uma potência sobre outros territórios.
+TEORIASRACIAIS | Ideias que classificavam os seres humanos em supostas raças superiores e inferiores.
+DARWINISMO | Apropriação distorcida da seleção natural para justificar desigualdades entre grupos humanos.
+DETERMINISMO | Concepção segundo a qual raça, ambiente e condições naturais determinariam o destino das sociedades.
+EUROPEIA | Origem das potências que ampliaram seu domínio sobre territórios africanos e asiáticos.
+AFRICA | Continente que sofreu a expansão colonial europeia durante o século XIX.
+ASIA | Continente que também foi alvo da expansão imperialista europeia.
+MISSAO | Palavra utilizada pelos europeus para apresentar a dominação colonial como uma obrigação civilizadora.
+MATERIASPRIMAS | Recursos naturais retirados das colônias para atender às necessidades econômicas europeias.
+MERCADOS | Espaços consumidores procurados pelas potências europeias para comercializar seus produtos.
+AUTONOMIA | Capacidade de um povo de governar a si mesmo, perdida por diversas sociedades colonizadas.
+EXPLORACAO | Utilização dos recursos naturais e da mão de obra dos territórios dominados em benefício das potências coloniais.
+`,
+  },
 ];
 
 export const CUSTOM_ID = "custom";

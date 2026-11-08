@@ -2,14 +2,11 @@
 
 Nome do projeto: `cruzadinha-professorjoas`.
 
-Endereço personalizado planejado: `https://cruzadinha.professorjoas.com.br`.
-A ativação depende da associação do subdomínio na Vercel e do registro DNS na
-Netlify. Veja o roteiro em [DOMINIO.md](./DOMINIO.md).
+Endereço canônico: `https://cruzadinha.professorjoas.com.br`.
+Veja a integração com o Escaninho em [DOMINIO.md](./DOMINIO.md).
 
-A integração atual do Escaninho Digital e o endereço
-`https://cruzadinha-escaninho.vercel.app` continuam usando o mesmo aplicativo.
-O repositório GitHub e o nome do projeto de hospedagem permanecem como estão
-para preservar as conexões existentes durante a ativação do domínio.
+O Escaninho Digital incorpora este mesmo aplicativo na página
+`/atividades/cruzadinha/`.
 
 Atividades de História e Filosofia com montagem automática, editor de conteúdo,
 conferência, gabarito, teclado virtual e impressão.
@@ -96,6 +93,15 @@ Sem coordenadas, o motor monta a grade automaticamente. H significa horizontal,
 V vertical. As coordenadas começam em 1 e vão até 40. Cada resposta contém
 de 3 a 16 letras; são permitidas até 20 palavras. Acentos são normalizados.
 O editor informa problemas de leitura e de encaixe antes de aplicar a atividade.
+
+## Galeria pública
+
+Os temas permanentes da galeria são cadastrados em `src/data/puzzles.ts`.
+Depois de adicionar uma atividade ali e publicar o projeto da cruzadinha, ela
+aparece tanto em `cruzadinha.professorjoas.com.br` quanto dentro da página
+incorporada do Escaninho. Uma atividade criada apenas no editor e compartilhada
+por link não entra automaticamente na galeria; para torná-la permanente, inclua
+seu título, respostas e dicas nesse arquivo e publique o projeto.
 
 ## Navegação e dados
 
