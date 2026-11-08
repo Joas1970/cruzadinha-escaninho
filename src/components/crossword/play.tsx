@@ -501,6 +501,12 @@ export function CrosswordPlay() {
           </div>
         </header>
 
+        <div className="print-student-info" aria-label="Identificação do aluno">
+          <span><strong>Nome:</strong> <i /></span>
+          <span><strong>Turma:</strong> <i /></span>
+          <span><strong>Data:</strong> <i /></span>
+        </div>
+
         {teacher && !editing ? (
           <div className="no-print flex flex-wrap items-center justify-between gap-3 border-y border-line py-4">
             <div className="max-w-xl text-sm text-ink-soft">
