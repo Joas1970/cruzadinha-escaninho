@@ -76,6 +76,8 @@ export function CrosswordPlay() {
   const [baseUrl, setBaseUrl] = useState("");
   const [sharedSource, setSharedSource] = useState("");
   const [activityError, setActivityError] = useState("");
+  const [studentName, setStudentName] = useState("");
+  const [studentClass, setStudentClass] = useState("");
   const appRoot = useRef<HTMLDivElement | null>(null);
   const teacher = location?.teacher === true;
   const canCheck = teacher || location?.canCheck !== false;
@@ -501,10 +503,37 @@ export function CrosswordPlay() {
           </div>
         </header>
 
+        <div className="no-print student-identification">
+          <p className="text-sm font-semibold text-ink">Identificação para a atividade</p>
+          <p className="mt-1 text-sm text-ink-soft">Preencha para incluir esses dados ao imprimir ou salvar em PDF.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm font-semibold">
+              Nome do aluno
+              <input
+                className="share-field"
+                type="text"
+                autoComplete="name"
+                value={studentName}
+                onChange={(event) => setStudentName(event.target.value)}
+                placeholder="Digite o nome"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold">
+              Turma
+              <input
+                className="share-field"
+                type="text"
+                value={studentClass}
+                onChange={(event) => setStudentClass(event.target.value)}
+                placeholder="Digite a turma"
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="print-student-info" aria-label="Identificação do aluno">
-          <span><strong>Nome:</strong> <i /></span>
-          <span><strong>Turma:</strong> <i /></span>
-          <span><strong>Data:</strong> <i /></span>
+          <span><strong>Nome:</strong><i>{studentName || "\u00a0"}</i></span>
+          <span><strong>Turma:</strong><i>{studentClass || "\u00a0"}</i></span>
         </div>
 
         {teacher && !editing ? (

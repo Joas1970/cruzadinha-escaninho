@@ -106,6 +106,7 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visi
 }
 
 .print-student-info { display: none; }
+.student-identification { border: 1px solid var(--color-line); border-radius: 8px; padding: 14px; }
 
 @media print {
   .print-student-info {
@@ -128,8 +129,10 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visi
     display: block;
     flex: 1;
     min-width: 1.5cm;
-    height: 0.8em;
+    min-height: 1em;
     border-bottom: 1px solid black;
+    font-style: normal;
+    font-weight: 400;
   }
 
   .no-print {
