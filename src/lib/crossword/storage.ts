@@ -5,6 +5,7 @@ export type Save = {
   customSource: string;
   progress: Record<string, Record<string, string>>;
   helped: Record<string, boolean>;
+  gallery: Array<{ id: string; source: string }>;
 };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -24,13 +25,24 @@ export function parseSave(raw: string): Save {
           cells[key] = letter;
         }
       }
-      Object.defineProperty(progress, signature, { value: cells, enumerable: true, writable: true, configurable: true });
+      Object.defineProperty(progress, signature, {
+        value: cells,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
   }
   const helped: Save["helped"] = {};
   if (record(value.helped)) {
     for (const [key, flag] of Object.entries(value.helped)) {
-      if (flag === true) Object.defineProperty(helped, key, { value: true, enumerable: true, writable: true, configurable: true });
+      if (flag === true)
+        Object.defineProperty(helped, key, {
+          value: true,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
     }
   }
   return {
@@ -38,6 +50,17 @@ export function parseSave(raw: string): Save {
     customSource: typeof value.customSource === "string" ? value.customSource : "",
     progress,
     helped,
+    gallery: Array.isArray(value.gallery)
+      ? value.gallery
+          .filter(
+            (item): item is { id: string; source: string } =>
+              record(item) &&
+              typeof item.id === "string" &&
+              typeof item.source === "string" &&
+              item.source.length <= 40_000,
+          )
+          .slice(0, 100)
+      : [],
   };
 }
 

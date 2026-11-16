@@ -70,6 +70,7 @@ function wordCellsMatch(
 export function CrosswordPlay() {
   const [puzzleId, setPuzzleId] = useState(builtIns[0]!.id);
   const [customSource, setCustomSource] = useState("");
+  const [gallery, setGallery] = useState<Array<{ id: string; source: string }>>([]);
   const [progress, setProgress] = useState<Record<string, Record<string, string>>>({});
   const [hydrated, setHydrated] = useState(false);
   const [location, setLocation] = useState<ActivityLocation | null>(null);
@@ -99,7 +100,8 @@ export function CrosswordPlay() {
   const wantFocus = useRef(false);
   const skipReset = useRef(true);
 
-  const contentSource = sharedSource || customSource;
+  const savedActivity = gallery.find((item) => item.id === puzzleId);
+  const contentSource = sharedSource || savedActivity?.source || customSource;
   const customModel = useMemo(
     () => (contentSource.trim() ? buildPuzzle(contentSource) : null),
     [contentSource],
@@ -139,6 +141,7 @@ export function CrosswordPlay() {
       setRevealed({});
       if (saved) {
         setCustomSource(saved.customSource);
+        setGallery(saved.gallery ?? []);
         // Migrate previous attempts into the teacher namespace only.
         const migrate = <T,>(values: Record<string, T>) =>
           Object.fromEntries(
@@ -151,7 +154,9 @@ export function CrosswordPlay() {
         setHelpHistory(migrate(saved.helped));
         if (incoming.teacher && !incoming.puzzleId) {
           setPuzzleId(
-            saved.puzzleId === CUSTOM_ID || builtIns.some((puzzle) => puzzle.id === saved.puzzleId)
+            saved.puzzleId === CUSTOM_ID ||
+              saved.gallery.some((item) => item.id === saved.puzzleId) ||
+              builtIns.some((puzzle) => puzzle.id === saved.puzzleId)
               ? saved.puzzleId
               : builtIns[0]!.id,
           );
@@ -191,6 +196,7 @@ export function CrosswordPlay() {
       customSource,
       progress,
       helped: helpHistory,
+      gallery,
     };
     try {
       setStorageWarning(
@@ -203,7 +209,7 @@ export function CrosswordPlay() {
         "O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.",
       );
     }
-  }, [hydrated, puzzleId, customSource, progress, helpHistory, teacher]);
+  }, [hydrated, puzzleId, customSource, progress, helpHistory, gallery, teacher]);
 
   useEffect(() => {
     if (skipReset.current) {
@@ -387,9 +393,40 @@ export function CrosswordPlay() {
     if (!teacher) return;
     const next = buildPuzzle(draft);
     if (next.words.length === 0 || next.issues.length > 0 || next.omitted.length > 0) return;
-    setCustomSource(draft);
-    setPuzzleId(CUSTOM_ID);
+    const activityId = gallery.some((item) => item.id === puzzleId) ? puzzleId : CUSTOM_ID;
+    if (activityId !== CUSTOM_ID) {
+      setGallery((items) =>
+        items.map((item) => (item.id === activityId ? { ...item, source: draft } : item)),
+      );
+    } else {
+      setCustomSource(draft);
+    }
+    setPuzzleId(activityId);
     setEditing(false);
+  }
+
+  function saveToGallery() {
+    if (!teacher || !source.trim()) return;
+    const current = gallery.find((item) => item.id === puzzleId);
+    if (current) {
+      setGallery((items) =>
+        items.map((item) => (item.id === current.id ? { ...item, source } : item)),
+      );
+      setStorageWarning("Atividade atualizada na sua galeria.");
+      return;
+    }
+    const id = `galeria-${crypto.randomUUID()}`;
+    setGallery((items) => [...items, { id, source }]);
+    setPuzzleId(id);
+    setStorageWarning("Atividade salva na sua galeria deste navegador.");
+  }
+
+  function deleteFromGallery(id: string) {
+    const title = buildPuzzle(gallery.find((item) => item.id === id)?.source ?? "").title;
+    if (!window.confirm(`Excluir “${title || "esta atividade"}” da sua galeria?`)) return;
+    setGallery((items) => items.filter((item) => item.id !== id));
+    if (puzzleId === id) setPuzzleId(builtIns[0]!.id);
+    setStorageWarning("Atividade removida da galeria.");
   }
 
   function printSheet(blank: boolean) {
@@ -409,6 +446,10 @@ export function CrosswordPlay() {
   }, [editing]);
   const chips = [
     ...builtIns.map((puzzle) => ({ id: puzzle.id, label: puzzle.model.title })),
+    ...gallery.map((item) => ({
+      id: item.id,
+      label: buildPuzzle(item.source).title || "Minha atividade",
+    })),
     ...(teacher && customSource.trim()
       ? [{ id: CUSTOM_ID, label: customModel?.title || "Meu texto" }]
       : []),
@@ -505,7 +546,9 @@ export function CrosswordPlay() {
 
         <div className="no-print student-identification">
           <p className="text-sm font-semibold text-ink">Identificação para a atividade</p>
-          <p className="mt-1 text-sm text-ink-soft">Preencha para incluir esses dados ao imprimir ou salvar em PDF.</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            Preencha para incluir esses dados ao imprimir ou salvar em PDF.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm font-semibold">
               Nome do aluno
@@ -532,8 +575,14 @@ export function CrosswordPlay() {
         </div>
 
         <div className="print-student-info" aria-label="Identificação do aluno">
-          <span><strong>Nome:</strong><i>{studentName || "\u00a0"}</i></span>
-          <span><strong>Turma:</strong><i>{studentClass || "\u00a0"}</i></span>
+          <span>
+            <strong>Nome:</strong>
+            <i>{studentName || "\u00a0"}</i>
+          </span>
+          <span>
+            <strong>Turma:</strong>
+            <i>{studentClass || "\u00a0"}</i>
+          </span>
         </div>
 
         {teacher && !editing ? (
@@ -541,11 +590,38 @@ export function CrosswordPlay() {
             <div className="max-w-xl text-sm text-ink-soft">
               <h2 className="mb-2 font-semibold text-ink">Prepare e envie sua atividade</h2>
               <ol className="list-inside list-decimal space-y-1">
-                <li>Abra <strong>Conteúdo</strong> para editar as palavras e dicas.</li>
-                <li>Clique em <strong>Montar grade</strong> para aplicar sua lista.</li>
-                <li>Use <strong>Compartilhar atividade</strong>: link, WhatsApp, QR code e apresentação.</li>
+                <li>
+                  Escolha uma cruzadinha na galeria e use <strong>Editar atividade</strong> para
+                  alterar título, palavras e dicas.
+                </li>
+                <li>
+                  Clique em <strong>Montar grade</strong> para aplicar sua lista.
+                </li>
+                <li>
+                  Use <strong>Compartilhar atividade</strong>: link, WhatsApp, QR code e
+                  apresentação.
+                </li>
               </ol>
-              <p className="mt-2">Os alunos recebem a atividade sem Revelar, Gabarito ou editor.</p>
+              <p className="mt-2">
+                Salve sua atividade na galeria para encontrá-la novamente neste navegador. As
+                atividades salvas podem ser editadas ou excluídas.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <ToolButton onClick={openEditor}>
+                  <PenLine className="size-4" aria-hidden />
+                  Editar atividade
+                </ToolButton>
+                <ToolButton onClick={saveToGallery} tone="primary">
+                  {gallery.some((item) => item.id === puzzleId)
+                    ? "Salvar alterações"
+                    : "Salvar uma cópia na galeria"}
+                </ToolButton>
+                {gallery.some((item) => item.id === puzzleId) ? (
+                  <ToolButton onClick={() => deleteFromGallery(puzzleId)}>
+                    Excluir da galeria
+                  </ToolButton>
+                ) : null}
+              </div>
             </div>
             <Suspense
               fallback={
@@ -573,21 +649,36 @@ export function CrosswordPlay() {
               {chips.map((chip) => {
                 const on = chip.id === puzzleId && !editing;
                 return (
-                  <button
+                  <div
                     key={chip.id}
-                    type="button"
-                    onClick={() => {
-                      setPuzzleId(chip.id);
-                      setEditing(false);
-                    }}
-                    className={
-                      on
-                        ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
-                        : "h-11 shrink-0 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink"
-                    }
+                    className="flex shrink-0 items-center gap-1 rounded-full bg-paper-deep p-1"
                   >
-                    {chip.label}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPuzzleId(chip.id);
+                        setEditing(false);
+                      }}
+                      className={
+                        on
+                          ? "min-h-10 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
+                          : "min-h-10 rounded-full px-4 text-sm font-semibold text-ink"
+                      }
+                    >
+                      {chip.label}
+                    </button>
+                    {teacher && gallery.some((item) => item.id === chip.id) ? (
+                      <button
+                        type="button"
+                        aria-label={`Excluir ${chip.label} da galeria`}
+                        title="Excluir da galeria"
+                        onClick={() => deleteFromGallery(chip.id)}
+                        className="min-h-10 rounded-full px-3 text-sm font-semibold text-ink hover:bg-paper"
+                      >
+                        Excluir
+                      </button>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
@@ -981,11 +1072,38 @@ function Editor({
         <pre className="mt-3 max-w-full overflow-x-auto bg-paper-deep p-4 text-sm text-ink">{`PALAVRA | Dica que o aluno lê
 OUTRA | Segunda dica
 # Título na primeira linha com cerquilha
+# Reflexão ou lembrete (opcional)
 
 Posição travada, se quiser desenhar a grade:
 CASA | lar | 1,1,H
 AMOR | afeto | 1,2,V`}</pre>
       </div>
+      <label className="grid max-w-3xl gap-2 text-sm font-semibold">
+        Lembrete ou reflexão para a turma (opcional)
+        <textarea
+          value={model.note}
+          onChange={(event) => {
+            const lines = draft.split(/\r?\n/);
+            const titleLine =
+              lines.find((line) => line.trim().startsWith("#")) ?? `# ${model.title}`;
+            const contentLines = lines.filter((line) => !line.trim().startsWith("#"));
+            const noteLine = event.target.value.trim() ? `# ${event.target.value}` : "";
+            onChange(
+              [titleLine, noteLine, "", contentLines.join("\n").trimStart()]
+                .filter((line, index) => line || index < 3)
+                .join("\n"),
+            );
+          }}
+          rows={3}
+          maxLength={500}
+          placeholder="Ex.: Que ideias desta atividade ainda aparecem na sociedade atual?"
+          className="w-full border border-line bg-paper p-3 font-sans text-base font-normal leading-relaxed text-ink"
+          aria-label="Lembrete ou reflexão da atividade"
+        />
+        <span className="font-normal text-ink-soft">
+          Esse texto aparece logo abaixo do título e não vira uma palavra da cruzadinha.
+        </span>
+      </label>
       <label className="grid gap-2 text-sm font-semibold">
         Partir de um exemplo
         <select

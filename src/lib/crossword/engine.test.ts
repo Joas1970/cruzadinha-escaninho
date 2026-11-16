@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PUZZLES } from "../../data/puzzles.ts";
-import { buildPuzzle, normalizeAnswer, parseSource, puzzleMatrix, type PuzzleModel } from "./engine.ts";
+import {
+  buildPuzzle,
+  normalizeAnswer,
+  parseSource,
+  puzzleMatrix,
+  type PuzzleModel,
+} from "./engine.ts";
 
 function runsOf(model: PuzzleModel) {
   const matrix = puzzleMatrix(model);
@@ -33,7 +39,9 @@ function runsOf(model: PuzzleModel) {
 }
 
 function assertLegal(model: PuzzleModel) {
-  const across = model.words.filter((word) => word.direction === "across").map((word) => word.answer);
+  const across = model.words
+    .filter((word) => word.direction === "across")
+    .map((word) => word.answer);
   const down = model.words.filter((word) => word.direction === "down").map((word) => word.answer);
   const { horizontal, vertical } = runsOf(model);
   for (const run of horizontal) {
@@ -76,6 +84,16 @@ describe("parseSource", () => {
     const bad = parseSource("sem separador");
     assert.equal(bad.entries.length, 0);
     assert.equal(bad.issues.length, 1);
+  });
+
+  it("mantém a reflexão em metadados, fora da lista de respostas", () => {
+    const parsed = parseSource(
+      "# História moderna\n# Que marcas desse período ainda existem hoje?\n\nILUMINISMO | movimento do século XVIII",
+    );
+    assert.equal(parsed.title, "História moderna");
+    assert.equal(parsed.note, "Que marcas desse período ainda existem hoje?");
+    assert.equal(parsed.issues.length, 0);
+    assert.equal(parsed.entries.length, 1);
   });
 });
 
