@@ -98,6 +98,13 @@ describe("parseSource", () => {
 });
 
 describe("buildPuzzle", () => {
+  it("não inclui a atividade duplicada de teorias raciais na galeria fixa", () => {
+    assert.equal(
+      PUZZLES.some((puzzle) => puzzle.id === "teorias-raciais"),
+      false,
+    );
+  });
+
   it("respeita posição manual e aponta conflito", () => {
     const ok = buildPuzzle("# Casa\nCASA | lar | 1,1,H\nAMOR | afeto | 1,2,V\n");
     assert.equal(ok.omitted.length, 0);
