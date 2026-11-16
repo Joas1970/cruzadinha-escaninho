@@ -45,6 +45,51 @@ function signature(model: PuzzleModel) {
     .join("|");
 }
 
+function splitDraftNote(source: string) {
+  const words: string[] = [];
+  const notes: string[] = [];
+  let titleSeen = false;
+  let noteStarted = false;
+
+  for (const line of source.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("#")) {
+      const text = trimmed.replace(/^#+\s*/, "");
+      if (!titleSeen) {
+        titleSeen = true;
+        words.push(line);
+      } else if (text) {
+        noteStarted = true;
+        notes.push(text);
+      }
+    } else if (
+      noteStarted &&
+      trimmed &&
+      !trimmed.startsWith("//") &&
+      !trimmed.includes("|") &&
+      !trimmed.includes("\t") &&
+      !/^\S+\s+[-–—]\s+.+$/.test(trimmed)
+    ) {
+      notes.push(trimmed);
+    } else {
+      words.push(line);
+    }
+  }
+
+  return { words: words.join("\n").trim(), note: notes.join("\n") };
+}
+
+function composeDraftSource(words: string, note: string) {
+  const separated = splitDraftNote(words);
+  const allNotes = [separated.note, note.trim()].filter(Boolean).join("\n");
+  const noteLines = allNotes
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*#+\s*/, "").trim())
+    .filter(Boolean)
+    .map((line) => `# ${line}`);
+  return [separated.words, ...noteLines].filter(Boolean).join("\n\n");
+}
+
 function readSave(): Save | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -85,6 +130,7 @@ export function CrosswordPlay() {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState(builtIns[0]!.source);
+  const [draftNote, setDraftNote] = useState("");
   const [checked, setChecked] = useState(false);
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -387,7 +433,9 @@ export function CrosswordPlay() {
 
   function openEditor() {
     if (!teacher) return;
-    setDraft(source || builtIns[0]!.source);
+    const separated = splitDraftNote(source || builtIns[0]!.source);
+    setDraft(separated.words);
+    setDraftNote(separated.note);
     setCreating(false);
     setEditing(true);
   }
@@ -395,17 +443,19 @@ export function CrosswordPlay() {
   function createActivity() {
     if (!teacher) return;
     setDraft("# Nova atividade\n\n");
+    setDraftNote("");
     setCreating(true);
     setEditing(true);
   }
 
   function applyDraft() {
     if (!teacher) return;
-    const next = buildPuzzle(draft);
+    const nextSource = composeDraftSource(draft, draftNote);
+    const next = buildPuzzle(nextSource);
     if (next.words.length === 0 || next.issues.length > 0 || next.omitted.length > 0) return;
     if (creating) {
       const id = `galeria-${crypto.randomUUID()}`;
-      setGallery((items) => [...items, { id, source: draft }]);
+      setGallery((items) => [...items, { id, source: nextSource }]);
       setPuzzleId(id);
       setCreating(false);
       setEditing(false);
@@ -415,10 +465,10 @@ export function CrosswordPlay() {
     const activityId = gallery.some((item) => item.id === puzzleId) ? puzzleId : CUSTOM_ID;
     if (activityId !== CUSTOM_ID) {
       setGallery((items) =>
-        items.map((item) => (item.id === activityId ? { ...item, source: draft } : item)),
+        items.map((item) => (item.id === activityId ? { ...item, source: nextSource } : item)),
       );
     } else {
-      setCustomSource(draft);
+      setCustomSource(nextSource);
     }
     setPuzzleId(activityId);
     setEditing(false);
@@ -458,7 +508,10 @@ export function CrosswordPlay() {
     window.print();
   }
 
-  const draftModel = useMemo(() => (editing ? buildPuzzle(draft) : null), [editing, draft]);
+  const draftModel = useMemo(
+    () => (editing ? buildPuzzle(composeDraftSource(draft, draftNote)) : null),
+    [editing, draft, draftNote],
+  );
 
   useEffect(() => {
     if (editing) editorRef.current?.focus();
@@ -718,9 +771,11 @@ export function CrosswordPlay() {
         {editing ? (
           <Editor
             draft={draft}
+            note={draftNote}
             model={draftModel!}
             editorRef={editorRef}
             onChange={setDraft}
+            onNoteChange={setDraftNote}
             onCancel={() => {
               setEditing(false);
               setCreating(false);
@@ -729,7 +784,11 @@ export function CrosswordPlay() {
             applyLabel={creating ? "Criar e salvar atividade" : "Montar grade"}
             onLoad={(id) => {
               const puzzle = builtIns.find((item) => item.id === id);
-              if (puzzle) setDraft(puzzle.source);
+              if (puzzle) {
+                const separated = splitDraftNote(puzzle.source);
+                setDraft(separated.words);
+                setDraftNote(separated.note);
+              }
             }}
           />
         ) : (
@@ -1072,18 +1131,22 @@ function ToolButton({
 
 function Editor({
   draft,
+  note,
   model,
   editorRef,
   onChange,
+  onNoteChange,
   onCancel,
   onApply,
   applyLabel,
   onLoad,
 }: {
   draft: string;
+  note: string;
   model: PuzzleModel;
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
   onCancel: () => void;
   onApply: () => void;
   applyLabel: string;
@@ -1111,27 +1174,17 @@ AMOR | afeto | 1,2,V`}</pre>
       <label className="grid max-w-3xl gap-2 text-sm font-semibold">
         Lembrete ou reflexão para a turma (opcional)
         <textarea
-          value={model.note}
-          onChange={(event) => {
-            const lines = draft.split(/\r?\n/);
-            const titleLine =
-              lines.find((line) => line.trim().startsWith("#")) ?? `# ${model.title}`;
-            const contentLines = lines.filter((line) => !line.trim().startsWith("#"));
-            const noteLine = event.target.value.trim() ? `# ${event.target.value}` : "";
-            onChange(
-              [titleLine, noteLine, "", contentLines.join("\n").trimStart()]
-                .filter((line, index) => line || index < 3)
-                .join("\n"),
-            );
-          }}
-          rows={3}
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          spellCheck
+          rows={4}
           maxLength={500}
-          placeholder="Ex.: Que ideias desta atividade ainda aparecem na sociedade atual?"
+          placeholder="Escreva uma orientação ou reflexão que aparecerá abaixo do título."
           className="w-full border border-line bg-paper p-3 font-sans text-base font-normal leading-relaxed text-ink"
           aria-label="Lembrete ou reflexão da atividade"
         />
         <span className="font-normal text-ink-soft">
-          Esse texto aparece logo abaixo do título e não vira uma palavra da cruzadinha.
+          Este campo é separado das palavras e dicas e não será usado para montar a grade.
         </span>
       </label>
       <label className="grid gap-2 text-sm font-semibold">
