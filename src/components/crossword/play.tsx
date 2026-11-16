@@ -83,6 +83,7 @@ export function CrosswordPlay() {
   const teacher = location?.teacher === true;
   const canCheck = teacher || location?.canCheck !== false;
   const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState(builtIns[0]!.source);
   const [checked, setChecked] = useState(false);
   const [revealAll, setRevealAll] = useState(false);
@@ -136,6 +137,7 @@ export function CrosswordPlay() {
       setSharedSource("");
       setPuzzleId(builtIns[0]!.id);
       setEditing(false);
+      setCreating(false);
       setChecked(false);
       setRevealAll(false);
       setRevealed({});
@@ -386,6 +388,14 @@ export function CrosswordPlay() {
   function openEditor() {
     if (!teacher) return;
     setDraft(source || builtIns[0]!.source);
+    setCreating(false);
+    setEditing(true);
+  }
+
+  function createActivity() {
+    if (!teacher) return;
+    setDraft("# Nova atividade\n\n");
+    setCreating(true);
     setEditing(true);
   }
 
@@ -393,6 +403,15 @@ export function CrosswordPlay() {
     if (!teacher) return;
     const next = buildPuzzle(draft);
     if (next.words.length === 0 || next.issues.length > 0 || next.omitted.length > 0) return;
+    if (creating) {
+      const id = `galeria-${crypto.randomUUID()}`;
+      setGallery((items) => [...items, { id, source: draft }]);
+      setPuzzleId(id);
+      setCreating(false);
+      setEditing(false);
+      setStorageWarning("Nova atividade criada e salva na sua galeria deste navegador.");
+      return;
+    }
     const activityId = gallery.some((item) => item.id === puzzleId) ? puzzleId : CUSTOM_ID;
     if (activityId !== CUSTOM_ID) {
       setGallery((items) =>
@@ -528,7 +547,7 @@ export function CrosswordPlay() {
             {teacher ? (
               <ToolButton onClick={openEditor}>
                 <PenLine className="size-4" aria-hidden />
-                Conteúdo
+                Editar atividade
               </ToolButton>
             ) : null}
             <ToolButton onClick={() => printSheet(false)}>
@@ -621,6 +640,10 @@ export function CrosswordPlay() {
                     Excluir da galeria
                   </ToolButton>
                 ) : null}
+                <ToolButton onClick={createActivity} tone="primary">
+                  <PenLine className="size-4" aria-hidden />
+                  CRIAR ATIVIDADE
+                </ToolButton>
               </div>
             </div>
             <Suspense
@@ -658,6 +681,7 @@ export function CrosswordPlay() {
                       onClick={() => {
                         setPuzzleId(chip.id);
                         setEditing(false);
+                        setCreating(false);
                       }}
                       className={
                         on
@@ -697,8 +721,12 @@ export function CrosswordPlay() {
             model={draftModel!}
             editorRef={editorRef}
             onChange={setDraft}
-            onCancel={() => setEditing(false)}
+            onCancel={() => {
+              setEditing(false);
+              setCreating(false);
+            }}
             onApply={applyDraft}
+            applyLabel={creating ? "Criar e salvar atividade" : "Montar grade"}
             onLoad={(id) => {
               const puzzle = builtIns.find((item) => item.id === id);
               if (puzzle) setDraft(puzzle.source);
@@ -1049,6 +1077,7 @@ function Editor({
   onChange,
   onCancel,
   onApply,
+  applyLabel,
   onLoad,
 }: {
   draft: string;
@@ -1057,6 +1086,7 @@ function Editor({
   onChange: (value: string) => void;
   onCancel: () => void;
   onApply: () => void;
+  applyLabel: string;
   onLoad: (id: string) => void;
 }) {
   const issues = model.issues;
@@ -1157,7 +1187,7 @@ AMOR | afeto | 1,2,V`}</pre>
       </div>
       <div className="flex flex-wrap gap-2">
         <ToolButton onClick={onApply} tone="primary" disabled={blocked}>
-          Montar grade
+          {applyLabel}
         </ToolButton>
         <ToolButton onClick={onCancel}>Voltar</ToolButton>
       </div>
