@@ -661,6 +661,24 @@ export function CrosswordPlay() {
               <Printer className="size-4" aria-hidden />
               Imprimir
             </ToolButton>
+            {!teacher ? (
+              <Suspense
+                fallback={
+                  <span role="status" className="text-sm text-ink-soft">
+                    Preparando compartilhamento…
+                  </span>
+                }
+              >
+                <ShareDialog
+                  baseUrl={baseUrl}
+                  puzzleId={puzzleId}
+                  source={source}
+                  title={model.title}
+                  teacherMode={false}
+                  canCheckInitially={canCheck}
+                />
+              </Suspense>
+            ) : null}
             {!teacher && !location?.embedded ? (
               <a className="tool-button bg-ink text-paper" href="/?modo=professor">
                 <PenLine className="size-4" aria-hidden />

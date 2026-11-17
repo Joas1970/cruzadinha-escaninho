@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, Download, ExternalLink, Maximize2, MessageCircle, Share2, X } from "lucide-react";
@@ -9,19 +9,26 @@ export function ShareDialog({
   puzzleId,
   source,
   title,
+  teacherMode = true,
+  canCheckInitially = true,
 }: {
   baseUrl: string;
   puzzleId: string;
   source: string;
   title: string;
+  teacherMode?: boolean;
+  canCheckInitially?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [presentation, setPresentation] = useState(false);
-  const [canCheck, setCanCheck] = useState(true);
+  const [canCheck, setCanCheck] = useState(canCheckInitially);
   const [feedback, setFeedback] = useState("");
   const qrRef = useRef<HTMLDivElement | null>(null);
   const linkRef = useRef<HTMLInputElement | null>(null);
   const codeRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (!teacherMode) setCanCheck(canCheckInitially);
+  }, [teacherMode, canCheckInitially]);
   const share = useMemo(() => {
     try {
       const url = activityUrl(baseUrl, { puzzleId, source }, canCheck);
@@ -42,7 +49,9 @@ export function ShareDialog({
       await navigator.clipboard.writeText(value);
       setFeedback(
         kind === "link"
-          ? "Link copiado. Já pode enviar aos alunos."
+          ? teacherMode
+            ? "Link copiado. Já pode enviar aos alunos."
+            : "Link copiado. Compartilhe com outro aluno."
           : "Código de incorporação copiado.",
       );
     } catch {
@@ -121,11 +130,13 @@ export function ShareDialog({
           <Dialog.Description id="share-description" className="mt-3 text-ink-soft">
             {presentation ? (
               "Aponte a câmera para o QR code e faça a atividade."
-            ) : (
+            ) : teacherMode ? (
               <>
                 Envie <strong>{title}</strong> no modo aluno, sem Revelar, Gabarito ou editor de
                 conteúdo.
               </>
+            ) : (
+              <>Compartilhe <strong>{title}</strong> com outro aluno pelo link ou WhatsApp.</>
             )}
           </Dialog.Description>
           {share.error ? (
@@ -167,7 +178,7 @@ export function ShareDialog({
               </div>
               <div className="min-w-0">
                 <label className="grid gap-2 text-sm font-semibold">
-                  Link para os alunos
+                  {teacherMode ? "Link para os alunos" : "Link desta atividade"}
                   <input
                     ref={linkRef}
                     className="share-field"
@@ -184,16 +195,18 @@ export function ShareDialog({
                   >
                     <Copy size={16} aria-hidden /> Copiar link
                   </button>
-                  <a
-                    className="tool-button"
-                    href={share.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink size={16} aria-hidden /> Abrir como aluno
-                  </a>
+                  {teacherMode ? (
+                    <a
+                      className="tool-button"
+                      href={share.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink size={16} aria-hidden /> Abrir como aluno
+                    </a>
+                  ) : null}
                 </div>
-                {!presentation ? (
+                {!presentation && teacherMode ? (
                   <>
                     <label className="mt-5 flex min-h-11 items-center gap-3 text-sm">
                       <input
@@ -257,7 +270,7 @@ export function ShareDialog({
                       </button>
                     </details>
                   </>
-                ) : (
+                ) : presentation ? (
                   <button
                     className="tool-button mt-5"
                     type="button"
@@ -265,7 +278,22 @@ export function ShareDialog({
                   >
                     Voltar às opções
                   </button>
-                )}
+                ) : null}
+                {!presentation && !teacherMode ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      className="tool-button"
+                      href={`https://wa.me/?text=${encodeURIComponent(activityMessage(title, share.url))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <MessageCircle size={16} aria-hidden /> WhatsApp
+                    </a>
+                    <button className="tool-button" type="button" onClick={nativeShare}>
+                      <Share2 size={16} aria-hidden /> Compartilhar no dispositivo
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
