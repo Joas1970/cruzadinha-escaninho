@@ -24,6 +24,14 @@ import {
 import { parseSave, writeSave, STORAGE_KEY, type Save } from "@/lib/crossword/storage";
 import { readActivityLocation, type ActivityLocation } from "@/lib/crossword/sharing";
 import { EmbedBridge } from "./embed-bridge";
+import { SignInButtons } from "@/lib/auth/gates";
+import { authEnabled } from "@/lib/auth/client";
+import {
+  deleteCuratedActivity,
+  getCuratorAccess,
+  listCuratedActivities,
+  saveCuratedActivity,
+} from "@/lib/crossword/gallery";
 const ShareDialog = lazy(() =>
   import("./share-dialog").then((module) => ({ default: module.ShareDialog })),
 );
@@ -115,7 +123,9 @@ function wordCellsMatch(
 export function CrosswordPlay() {
   const [puzzleId, setPuzzleId] = useState(builtIns[0]!.id);
   const [customSource, setCustomSource] = useState("");
-  const [gallery, setGallery] = useState<Array<{ id: string; source: string }>>([]);
+  const [localGallery, setLocalGallery] = useState<Array<{ id: string; source: string }>>([]);
+  const [curatedGallery, setCuratedGallery] = useState<Array<{ id: string; source: string }>>([]);
+  const [curatorAccess, setCuratorAccess] = useState(false);
   const [progress, setProgress] = useState<Record<string, Record<string, string>>>({});
   const [hydrated, setHydrated] = useState(false);
   const [location, setLocation] = useState<ActivityLocation | null>(null);
@@ -126,6 +136,7 @@ export function CrosswordPlay() {
   const [studentClass, setStudentClass] = useState("");
   const appRoot = useRef<HTMLDivElement | null>(null);
   const teacher = location?.teacher === true;
+  const gallery = [...localGallery, ...curatedGallery];
   const canCheck = teacher || location?.canCheck !== false;
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -148,6 +159,7 @@ export function CrosswordPlay() {
   const skipReset = useRef(true);
 
   const savedActivity = gallery.find((item) => item.id === puzzleId);
+  const isCuratedActivity = puzzleId.startsWith("public-");
   const contentSource = sharedSource || savedActivity?.source || customSource;
   const customModel = useMemo(
     () => (contentSource.trim() ? buildPuzzle(contentSource) : null),
@@ -189,7 +201,7 @@ export function CrosswordPlay() {
       setRevealed({});
       if (saved) {
         setCustomSource(saved.customSource);
-        setGallery(saved.gallery ?? []);
+        setLocalGallery(saved.gallery ?? []);
         // Migrate previous attempts into the teacher namespace only.
         const migrate = <T,>(values: Record<string, T>) =>
           Object.fromEntries(
@@ -226,6 +238,12 @@ export function CrosswordPlay() {
         }
       }
       setHydrated(true);
+      void listCuratedActivities()
+        .then(setCuratedGallery)
+        .catch(() => setStorageWarning("A galeria compartilhada não pôde ser carregada agora."));
+      void getCuratorAccess()
+        .then((result) => setCuratorAccess(result.allowed))
+        .catch(() => setCuratorAccess(false));
     };
     restoreActivity();
     window.addEventListener("hashchange", restoreActivity);
@@ -244,20 +262,20 @@ export function CrosswordPlay() {
       customSource,
       progress,
       helped: helpHistory,
-      gallery,
+      gallery: localGallery,
     };
     try {
-      setStorageWarning(
-        writeSave(localStorage, payload)
-          ? ""
-          : "Não foi possível salvar neste navegador. Mantenha esta página aberta para preservar sua tentativa.",
-      );
+      if (!writeSave(localStorage, payload)) {
+        setStorageWarning(
+          "Não foi possível salvar neste navegador. Mantenha esta página aberta para preservar sua tentativa.",
+        );
+      }
     } catch {
       setStorageWarning(
         "O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.",
       );
     }
-  }, [hydrated, puzzleId, customSource, progress, helpHistory, gallery, teacher]);
+  }, [hydrated, puzzleId, customSource, progress, helpHistory, localGallery, teacher]);
 
   useEffect(() => {
     if (skipReset.current) {
@@ -455,7 +473,7 @@ export function CrosswordPlay() {
     if (next.words.length === 0 || next.issues.length > 0 || next.omitted.length > 0) return;
     if (creating) {
       const id = `galeria-${crypto.randomUUID()}`;
-      setGallery((items) => [...items, { id, source: nextSource }]);
+      setLocalGallery((items) => [...items, { id, source: nextSource }]);
       setPuzzleId(id);
       setCreating(false);
       setEditing(false);
@@ -464,9 +482,14 @@ export function CrosswordPlay() {
     }
     const activityId = gallery.some((item) => item.id === puzzleId) ? puzzleId : CUSTOM_ID;
     if (activityId !== CUSTOM_ID) {
-      setGallery((items) =>
-        items.map((item) => (item.id === activityId ? { ...item, source: nextSource } : item)),
-      );
+      if (activityId.startsWith("public-")) {
+        setCuratedGallery((items) =>
+          items.map((item) => (item.id === activityId ? { ...item, source: nextSource } : item)),
+        );
+      } else
+        setLocalGallery((items) =>
+          items.map((item) => (item.id === activityId ? { ...item, source: nextSource } : item)),
+        );
     } else {
       setCustomSource(nextSource);
     }
@@ -474,26 +497,43 @@ export function CrosswordPlay() {
     setEditing(false);
   }
 
-  function saveToGallery() {
+  async function saveToGallery() {
     if (!teacher || !source.trim()) return;
     const current = gallery.find((item) => item.id === puzzleId);
-    if (current) {
-      setGallery((items) =>
-        items.map((item) => (item.id === current.id ? { ...item, source } : item)),
+    try {
+      const saved = await saveCuratedActivity({
+        data: { id: isCuratedActivity ? puzzleId : undefined, source: current?.source ?? source },
+      });
+      setCuratedGallery((items) => {
+        const withoutSaved = items.filter((item) => item.id !== saved.id);
+        return [...withoutSaved, saved];
+      });
+      setLocalGallery((items) => items.filter((item) => item.id !== puzzleId));
+      setPuzzleId(saved.id);
+      setStorageWarning(
+        "Atividade publicada na galeria permanente, disponível em todos os dispositivos.",
       );
-      setStorageWarning("Atividade atualizada na sua galeria.");
-      return;
+    } catch (error) {
+      setStorageWarning(
+        error instanceof Error ? error.message : "Não foi possível publicar a atividade.",
+      );
     }
-    const id = `galeria-${crypto.randomUUID()}`;
-    setGallery((items) => [...items, { id, source }]);
-    setPuzzleId(id);
-    setStorageWarning("Atividade salva na sua galeria deste navegador.");
   }
 
-  function deleteFromGallery(id: string) {
+  async function deleteFromGallery(id: string) {
     const title = buildPuzzle(gallery.find((item) => item.id === id)?.source ?? "").title;
     if (!window.confirm(`Excluir “${title || "esta atividade"}” da sua galeria?`)) return;
-    setGallery((items) => items.filter((item) => item.id !== id));
+    if (id.startsWith("public-")) {
+      try {
+        await deleteCuratedActivity({ data: { id } });
+        setCuratedGallery((items) => items.filter((item) => item.id !== id));
+      } catch (error) {
+        setStorageWarning(
+          error instanceof Error ? error.message : "Não foi possível excluir a atividade.",
+        );
+        return;
+      }
+    } else setLocalGallery((items) => items.filter((item) => item.id !== id));
     if (puzzleId === id) setPuzzleId(builtIns[0]!.id);
     setStorageWarning("Atividade removida da galeria.");
   }
@@ -675,20 +715,33 @@ export function CrosswordPlay() {
                 </li>
               </ol>
               <p className="mt-2">
-                Salve sua atividade na galeria para encontrá-la novamente neste navegador. As
-                atividades salvas podem ser editadas ou excluídas.
+                As atividades publicadas na galeria permanente ficam disponíveis para todos os
+                alunos e dispositivos. Rascunhos locais continuam apenas neste navegador.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <ToolButton onClick={openEditor}>
                   <PenLine className="size-4" aria-hidden />
                   Editar atividade
                 </ToolButton>
-                <ToolButton onClick={saveToGallery} tone="primary">
-                  {gallery.some((item) => item.id === puzzleId)
-                    ? "Salvar alterações"
-                    : "Salvar uma cópia na galeria"}
-                </ToolButton>
-                {gallery.some((item) => item.id === puzzleId) ? (
+                {curatorAccess ? (
+                  <ToolButton onClick={() => void saveToGallery()} tone="primary">
+                    {isCuratedActivity ? "Publicar alterações" : "Salvar na galeria permanente"}
+                  </ToolButton>
+                ) : authEnabled ? (
+                  <div className="w-full rounded-lg border border-line bg-paper-deep p-3 text-sm">
+                    <p className="mb-2">
+                      Entre com a conta autorizada de curador para publicar atividades.
+                    </p>
+                    <SignInButtons />
+                  </div>
+                ) : (
+                  <p className="w-full text-sm text-miss">
+                    A publicação permanente ainda não está habilitada neste site. É necessário
+                    ativar o login e configurar a conta do curador no Vercel.
+                  </p>
+                )}
+                {gallery.some((item) => item.id === puzzleId) &&
+                (!isCuratedActivity || curatorAccess) ? (
                   <ToolButton onClick={() => deleteFromGallery(puzzleId)}>
                     Excluir da galeria
                   </ToolButton>
@@ -744,7 +797,9 @@ export function CrosswordPlay() {
                     >
                       {chip.label}
                     </button>
-                    {teacher && gallery.some((item) => item.id === chip.id) ? (
+                    {teacher &&
+                    gallery.some((item) => item.id === chip.id) &&
+                    (!chip.id.startsWith("public-") || curatorAccess) ? (
                       <button
                         type="button"
                         aria-label={`Excluir ${chip.label} da galeria`}
@@ -781,7 +836,7 @@ export function CrosswordPlay() {
               setCreating(false);
             }}
             onApply={applyDraft}
-            applyLabel={creating ? "Criar e salvar atividade" : "Montar grade"}
+            applyLabel={creating ? "Criar atividade" : "Montar grade"}
             onLoad={(id) => {
               const puzzle = builtIns.find((item) => item.id === id);
               if (puzzle) {

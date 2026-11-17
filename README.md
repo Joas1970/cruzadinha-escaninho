@@ -23,8 +23,9 @@ para projetar na sala. O professor pode desativar o botão Conferir no link envi
 
 Os temas usam `?modo=aluno&tema=grecia`. As atividades personalizadas são
 comprimidas no fragmento `#atividade=...` do link, sem enviar as tentativas do
-professor. Não é necessário cadastro ou banco de dados. Preserve o link completo;
-editar a atividade depois não altera os links já enviados.
+professor. Compartilhar por link não exige conta nem banco; para publicar uma
+atividade na galeria permanente, o curador precisa entrar na conta autorizada.
+Preserve o link completo; editar a atividade depois não altera os links já enviados.
 
 Tentativas de alunos e professores ficam separadas no armazenamento local.
 Os modos organizam a interface; não são autenticação e não mantêm respostas em
@@ -94,14 +95,13 @@ V vertical. As coordenadas começam em 1 e vão até 40. Cada resposta contém
 de 3 a 16 letras; são permitidas até 20 palavras. Acentos são normalizados.
 O editor informa problemas de leitura e de encaixe antes de aplicar a atividade.
 
-## Galeria pública
+## Galeria permanente
 
-Os temas permanentes da galeria são cadastrados em `src/data/puzzles.ts`.
-Depois de adicionar uma atividade ali e publicar o projeto da cruzadinha, ela
-aparece tanto em `cruzadinha.professorjoas.com.br` quanto dentro da página
-incorporada do Escaninho. Uma atividade criada apenas no editor e compartilhada
-por link não entra automaticamente na galeria; para torná-la permanente, inclua
-seu título, respostas e dicas nesse arquivo e publique o projeto.
+Os temas iniciais continuam em `src/data/puzzles.ts`. Novas atividades podem ser
+publicadas pela área do professor em **Salvar na galeria permanente**. A galeria
+é compartilhada por `cruzadinha.professorjoas.com.br` e pela página incorporada
+do Escaninho. As alterações no editor só se tornam públicas depois de clicar em
+**Publicar alterações**.
 
 ## Navegação e dados
 
@@ -113,7 +113,26 @@ seu título, respostas e dicas nesse arquivo e publique o projeto.
 - Se o armazenamento falhar, um aviso informa que a tentativa fica apenas na página.
 - Limpar reinicia a tentativa atual, incluindo o histórico de ajuda.
 
-Não há sincronização entre dispositivos. Apagar os dados do navegador remove
-as tentativas e a atividade personalizada. As respostas fazem parte do código
-enviado ao navegador; este projeto é uma atividade educativa, não um sistema
-de avaliação com respostas sigilosas.
+As tentativas e rascunhos locais não são sincronizados. Apagar os dados do
+navegador remove esses dados, mas não remove atividades publicadas na galeria.
+As respostas fazem parte do código enviado ao navegador; este projeto é uma
+atividade educativa, não um sistema de avaliação com respostas sigilosas.
+
+# Galeria permanente de cruzadinhas
+
+As atividades da galeria permanente ficam no Postgres compartilhado do site e
+são visíveis para alunos em qualquer dispositivo. Para habilitar a publicação
+em produção, configure no projeto Vercel:
+
+- `DATABASE_URL`: conexão de produção do banco Neon. A migração cria as tabelas
+  de autenticação e da galeria durante o build.
+- `VITE_AUTH_ENABLED=true` e as credenciais de autenticação de produção
+  `GROK_AUTH_ISSUER`, `GROK_AUTH_CLIENT_ID`, `GROK_AUTH_CLIENT_SECRET` e
+  `BETTER_AUTH_URL`.
+- `CURATOR_EMAILS`: e-mail da conta autorizada a publicar, editar e excluir;
+  aceite vários endereços separados por vírgulas.
+
+Depois de definir as variáveis, faça um novo deploy de produção. O servidor
+valida a sessão e a lista de curadores em cada gravação. Se faltar o banco ou a
+conta autorizada, a publicação falha com uma mensagem clara. O armazenamento
+local do navegador continua servindo apenas para tentativas e rascunhos.
