@@ -126,11 +126,12 @@ em produção, configure no projeto Vercel:
 
 - `DATABASE_URL`: conexão de produção do banco Neon. A migração cria as tabelas
   de autenticação e da galeria durante o build.
-- `VITE_AUTH_ENABLED=true` e as credenciais de autenticação de produção
-  `GROK_AUTH_ISSUER`, `GROK_AUTH_CLIENT_ID`, `GROK_AUTH_CLIENT_SECRET` e
-  `BETTER_AUTH_URL`.
-- `CURATOR_EMAILS`: e-mail da conta autorizada a publicar, editar e excluir;
-  aceite vários endereços separados por vírgulas.
+- `CURATOR_EMAILS`: e-mail autorizado a administrar a galeria.
+- `CURATOR_PASSWORD`: senha forte e exclusiva, com pelo menos 16 caracteres.
+
+Não existe cadastro público. Na área do professor, entre com essas credenciais;
+a sessão é protegida por cookie HttpOnly e expira após 14 dias. O servidor
+confere a sessão em cada publicação, edição ou exclusão.
 
 Depois de definir as variáveis, faça um novo deploy de produção. O servidor
 valida a sessão e a lista de curadores em cada gravação. Se faltar o banco ou a

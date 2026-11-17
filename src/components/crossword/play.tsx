@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { BookOpen, Check, Eraser, Eye, PenLine, Printer } from "lucide-react";
+import { BookOpen, Check, Eraser, Eye, LogOut, PenLine, Printer } from "lucide-react";
 import { CUSTOM_ID, PUZZLES } from "@/data/puzzles";
 import {
   buildPuzzle,
@@ -24,12 +24,12 @@ import {
 import { parseSave, writeSave, STORAGE_KEY, type Save } from "@/lib/crossword/storage";
 import { readActivityLocation, type ActivityLocation } from "@/lib/crossword/sharing";
 import { EmbedBridge } from "./embed-bridge";
-import { SignInButtons } from "@/lib/auth/gates";
-import { authEnabled } from "@/lib/auth/client";
+import { CuratorLogin } from "./curator-login";
 import {
   deleteCuratedActivity,
   getCuratorAccess,
   listCuratedActivities,
+  logoutCurator,
   saveCuratedActivity,
 } from "@/lib/crossword/gallery";
 const ShareDialog = lazy(() =>
@@ -126,6 +126,7 @@ export function CrosswordPlay() {
   const [localGallery, setLocalGallery] = useState<Array<{ id: string; source: string }>>([]);
   const [curatedGallery, setCuratedGallery] = useState<Array<{ id: string; source: string }>>([]);
   const [curatorAccess, setCuratorAccess] = useState(false);
+  const [curatorConfigured, setCuratorConfigured] = useState(false);
   const [progress, setProgress] = useState<Record<string, Record<string, string>>>({});
   const [hydrated, setHydrated] = useState(false);
   const [location, setLocation] = useState<ActivityLocation | null>(null);
@@ -242,8 +243,14 @@ export function CrosswordPlay() {
         .then(setCuratedGallery)
         .catch(() => setStorageWarning("A galeria compartilhada não pôde ser carregada agora."));
       void getCuratorAccess()
-        .then((result) => setCuratorAccess(result.allowed))
-        .catch(() => setCuratorAccess(false));
+        .then((result) => {
+          setCuratorAccess(result.allowed);
+          setCuratorConfigured(result.configured);
+        })
+        .catch(() => {
+          setCuratorAccess(false);
+          setCuratorConfigured(false);
+        });
     };
     restoreActivity();
     window.addEventListener("hashchange", restoreActivity);
@@ -730,20 +737,28 @@ export function CrosswordPlay() {
                   Editar atividade
                 </ToolButton>
                 {curatorAccess ? (
-                  <ToolButton onClick={() => void saveToGallery()} tone="primary">
-                    {isCuratedActivity ? "Publicar alterações" : "Salvar na galeria permanente"}
-                  </ToolButton>
-                ) : authEnabled ? (
+                  <>
+                    <ToolButton onClick={() => void saveToGallery()} tone="primary">
+                      {isCuratedActivity ? "Publicar alterações" : "Salvar na galeria permanente"}
+                    </ToolButton>
+                    <ToolButton
+                      onClick={() => {
+                        void logoutCurator().then(() => setCuratorAccess(false));
+                      }}
+                    >
+                      <LogOut className="size-4" aria-hidden />
+                      Sair da área do curador
+                    </ToolButton>
+                  </>
+                ) : curatorConfigured ? (
                   <div className="w-full rounded-lg border border-line bg-paper-deep p-3 text-sm">
-                    <p className="mb-2">
-                      Entre com a conta autorizada de curador para publicar atividades.
-                    </p>
-                    <SignInButtons />
+                    <CuratorLogin onAccessGranted={() => setCuratorAccess(true)} />
                   </div>
                 ) : (
                   <p className="w-full text-sm text-miss">
-                    A publicação permanente ainda não está habilitada neste site. É necessário
-                    ativar o login e configurar a conta do curador no Vercel.
+                    O acesso do curador ainda não está configurado. Na Vercel, adicione CURATOR_EMAILS
+                    com seu e-mail e CURATOR_PASSWORD com uma senha forte de pelo menos 16 caracteres;
+                    depois publique novamente.
                   </p>
                 )}
                 {gallery.some((item) => item.id === puzzleId) &&
