@@ -799,8 +799,14 @@ export function CrosswordPlay() {
 
         {!sharedSource && (!location?.puzzleId || teacher) ? (
           <section className="no-print grid gap-3" aria-labelledby="activity-gallery-title">
-            <h2 id="activity-gallery-title" className="font-display text-2xl">
+            <h2
+              id="activity-gallery-title"
+              className="flex flex-wrap items-baseline gap-x-2 font-display text-2xl"
+            >
               Galeria de atividades
+              <span className="font-sans text-sm font-normal italic text-ink-soft">
+                · Para revisar conteúdos já trabalhados em sala.
+              </span>
             </h2>
             <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
               {chips.map((chip) => {
