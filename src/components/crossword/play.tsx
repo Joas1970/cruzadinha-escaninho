@@ -263,25 +263,32 @@ export function CrosswordPlay() {
 
   useEffect(() => {
     if (!hydrated) return;
-    const previous = readSave();
-    const payload: Save = {
-      puzzleId: teacher ? puzzleId : (previous?.puzzleId ?? builtIns[0]!.id),
-      customSource,
-      progress,
-      helped: helpHistory,
-      gallery: localGallery,
-    };
-    try {
-      if (!writeSave(localStorage, payload)) {
+    const persist = () => {
+      const previous = readSave();
+      const payload: Save = {
+        puzzleId: teacher ? puzzleId : (previous?.puzzleId ?? builtIns[0]!.id),
+        customSource,
+        progress,
+        helped: helpHistory,
+        gallery: localGallery,
+      };
+      try {
+        if (writeSave(localStorage, payload)) return;
         setStorageWarning(
           "Não foi possível salvar neste navegador. Mantenha esta página aberta para preservar sua tentativa.",
         );
+      } catch {
+        setStorageWarning(
+          "O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.",
+        );
       }
-    } catch {
-      setStorageWarning(
-        "O armazenamento está indisponível. Sua tentativa será mantida apenas nesta página.",
-      );
-    }
+    };
+    const timer = window.setTimeout(persist, 220);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pagehide", persist);
+    };
   }, [hydrated, puzzleId, customSource, progress, helpHistory, localGallery, teacher]);
 
   useEffect(() => {
