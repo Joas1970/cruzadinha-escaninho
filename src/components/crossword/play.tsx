@@ -661,6 +661,9 @@ export function CrosswordPlay() {
           <p className="mt-1 text-sm text-ink-soft">
             Preencha para incluir esses dados ao imprimir ou salvar em PDF.
           </p>
+          <p className="mt-1 text-sm font-medium text-ink-soft">
+            Atenção: escreva as palavras da cruzadinha sem acento.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm font-semibold">
               Nome do aluno
@@ -696,6 +699,9 @@ export function CrosswordPlay() {
             <i>{studentClass || "\u00a0"}</i>
           </span>
         </div>
+        <p className="print-accent-note">
+          Atenção: escreva as palavras da cruzadinha sem acento.
+        </p>
 
         {teacher && !editing ? (
           <div className="no-print flex flex-wrap items-center justify-between gap-3 border-y border-line py-4">

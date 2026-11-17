@@ -106,6 +106,7 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visi
 }
 
 .print-student-info { display: none; }
+.print-accent-note { display: none; }
 .student-identification { border: 1px solid var(--color-line); border-radius: 8px; padding: 14px; }
 
 @media print {
@@ -116,6 +117,13 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visi
     margin: 0 0 1.2rem;
     color: black;
     font-size: 11pt;
+  }
+
+  .print-accent-note {
+    display: block;
+    margin: -0.7rem 0 1.2rem;
+    color: black;
+    font-size: 9pt;
   }
 
   .print-student-info span {
