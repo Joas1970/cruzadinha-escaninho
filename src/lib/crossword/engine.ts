@@ -54,9 +54,9 @@ export type MatrixCell = {
 };
 
 const MAX_WORDS = 20;
-const MAX_SPAN = 16;
+const MAX_SPAN = 32;
 const MIN_LEN = 3;
-const MAX_LEN = 16;
+const MAX_LEN = 32;
 
 const DIR_WORD: Record<string, Direction> = {
   h: "across",
