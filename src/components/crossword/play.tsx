@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { BookOpen, Check, Eraser, Eye, LogOut, PenLine, Printer } from "lucide-react";
+import { BookOpen, Check, Eraser, Eye, LogOut, PenLine, Printer, Send } from "lucide-react";
 import { CUSTOM_ID, PUZZLES } from "@/data/puzzles";
 import {
   buildPuzzle,
@@ -135,6 +135,7 @@ export function CrosswordPlay() {
   const [activityError, setActivityError] = useState("");
   const [studentName, setStudentName] = useState("");
   const [studentClass, setStudentClass] = useState("");
+  const [submissionFeedback, setSubmissionFeedback] = useState("");
   const appRoot = useRef<HTMLDivElement | null>(null);
   const teacher = location?.teacher === true;
   const gallery = [...localGallery, ...curatedGallery];
@@ -463,6 +464,86 @@ export function CrosswordPlay() {
     setHelpHistory((prev) => ({ ...prev, [sig]: false }));
   }
 
+  async function shareCompletedActivity() {
+    const readAnswer = (word: PlacedWord) =>
+      cellsOf(word)
+        .map((cell) => fills[cellKey(cell.row, cell.col)] || "_")
+        .join("");
+    const completeCount = model.words.filter((word) =>
+      cellsOf(word).every((cell) => Boolean(fills[cellKey(cell.row, cell.col)])),
+    ).length;
+    const wordSection = (direction: Direction, heading: string) => {
+      const entries = model.words.filter((word) => word.direction === direction);
+      if (!entries.length) return [];
+      return [
+        heading,
+        ...entries.flatMap((word) => {
+          const response = readAnswer(word);
+          return [
+            `${word.number}. ${word.clue}`,
+            `Resposta: ${/^_+$/.test(response) ? "(não preenchida)" : response}`,
+            "",
+          ];
+        }),
+      ];
+    };
+    const report = [
+      "ATIVIDADE DE PALAVRAS CRUZADAS",
+      `Atividade: ${model.title}`,
+      `Nome: ${studentName.trim() || "(não informado)"}`,
+      `Turma: ${studentClass.trim() || "(não informada)"}`,
+      `Palavras preenchidas: ${completeCount} de ${model.words.length}`,
+      "",
+      ...wordSection("across", "HORIZONTAIS"),
+      ...wordSection("down", "VERTICAIS"),
+    ].join("\n");
+    const safeTitle =
+      model.title
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .toLocaleLowerCase("pt-BR")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "cruzadinha";
+    const file = new File([report], `respostas-${safeTitle}.txt`, {
+      type: "text/plain;charset=utf-8",
+    });
+    const title = `Respostas da cruzadinha: ${model.title}`;
+
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title,
+          text: `${studentName.trim() || "Aluno"} · ${studentClass.trim() || "Turma não informada"}`,
+        });
+        setSubmissionFeedback("Envio concluído pelo menu de compartilhamento do aparelho.");
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSubmissionFeedback(
+        "Arquivo baixado. Abra o menu Compartilhar do aparelho e escolha Bluetooth ou Quick Share.",
+      );
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setSubmissionFeedback("Compartilhamento cancelado.");
+        return;
+      }
+      setSubmissionFeedback("Não foi possível abrir o compartilhamento. O arquivo foi baixado.");
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+
   function openEditor() {
     if (!teacher) return;
     const separated = splitDraftNote(source || builtIns[0]!.source);
@@ -679,11 +760,28 @@ export function CrosswordPlay() {
                 />
               </Suspense>
             ) : null}
+            {!teacher ? (
+              <ToolButton onClick={() => void shareCompletedActivity()}>
+                <Send className="size-4" aria-hidden />
+                Enviar atividade realizada
+              </ToolButton>
+            ) : null}
+            {!teacher ? (
+              <p className="w-full text-xs text-ink-soft">
+                O arquivo inclui nome, turma e respostas. No menu do celular, escolha Bluetooth ou
+                Quick Share, se disponíveis.
+              </p>
+            ) : null}
             {!teacher && !location?.embedded ? (
               <a className="tool-button bg-ink text-paper" href="/?modo=professor">
                 <PenLine className="size-4" aria-hidden />
                 Sou professor · Criar atividade
               </a>
+            ) : null}
+            {submissionFeedback ? (
+              <p role="status" aria-live="polite" className="w-full text-sm text-ink-soft">
+                {submissionFeedback}
+              </p>
             ) : null}
           </div>
         </header>
