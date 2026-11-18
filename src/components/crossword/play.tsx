@@ -8,7 +8,18 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { BookOpen, Check, Eraser, Eye, LogOut, PenLine, Printer, Send } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  Eraser,
+  Eye,
+  LogOut,
+  PenLine,
+  Printer,
+  Search,
+  Send,
+} from "lucide-react";
 import { CUSTOM_ID, PUZZLES } from "@/data/puzzles";
 import {
   buildPuzzle,
@@ -38,6 +49,19 @@ const ShareDialog = lazy(() =>
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type Active = { row: number; col: number; dir: Direction };
+type GalleryFilter = "all" | "examples" | "created";
+type GalleryCard = {
+  id: string;
+  title: string;
+  note: string;
+  wordCount: number;
+  kind: "example" | "permanent" | "local" | "draft";
+};
+
+function normalizeGallerySearch(value: string) {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
+}
+
 const builtIns = PUZZLES.map((puzzle) => ({
   ...puzzle,
   model: buildPuzzle(puzzle.source),
@@ -136,6 +160,8 @@ export function CrosswordPlay() {
   const [studentName, setStudentName] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [submissionFeedback, setSubmissionFeedback] = useState("");
+  const [gallerySearch, setGallerySearch] = useState("");
+  const [galleryFilter, setGalleryFilter] = useState<GalleryFilter>("all");
   const appRoot = useRef<HTMLDivElement | null>(null);
   const teacher = location?.teacher === true;
   const gallery = [...localGallery, ...curatedGallery];
@@ -651,16 +677,57 @@ export function CrosswordPlay() {
   useEffect(() => {
     if (editing) editorRef.current?.focus();
   }, [editing]);
-  const chips = [
-    ...builtIns.map((puzzle) => ({ id: puzzle.id, label: puzzle.model.title })),
-    ...gallery.map((item) => ({
-      id: item.id,
-      label: buildPuzzle(item.source).title || "Minha atividade",
+  const activityCards: GalleryCard[] = [
+    ...builtIns.map((puzzle) => ({
+      id: puzzle.id,
+      title: puzzle.model.title,
+      note: puzzle.model.note,
+      wordCount: puzzle.model.words.length,
+      kind: "example" as const,
     })),
+    ...localGallery.map((item) => {
+      const activity = buildPuzzle(item.source);
+      return {
+        id: item.id,
+        title: activity.title || "Minha atividade",
+        note: activity.note,
+        wordCount: activity.words.length,
+        kind: "local" as const,
+      };
+    }),
+    ...[...curatedGallery].reverse().map((item) => {
+      const activity = buildPuzzle(item.source);
+      return {
+        id: item.id,
+        title: activity.title || "Atividade publicada",
+        note: activity.note,
+        wordCount: activity.words.length,
+        kind: "permanent" as const,
+      };
+    }),
     ...(teacher && customSource.trim()
-      ? [{ id: CUSTOM_ID, label: customModel?.title || "Meu texto" }]
+      ? [
+          {
+            id: CUSTOM_ID,
+            title: customModel?.title || "Meu texto",
+            note: customModel?.note || "",
+            wordCount: customModel?.words.length || 0,
+            kind: "draft" as const,
+          },
+        ]
       : []),
   ];
+  const normalizedSearch = normalizeGallerySearch(gallerySearch.trim());
+  const visibleCards = activityCards.filter((card) => {
+    const matchesFilter =
+      galleryFilter === "all" ||
+      (galleryFilter === "examples" && card.kind === "example") ||
+      (galleryFilter === "created" && card.kind !== "example");
+    const matchesSearch =
+      !normalizedSearch ||
+      normalizeGallerySearch(`${card.title} ${card.note}`).includes(normalizedSearch);
+    return matchesFilter && matchesSearch;
+  });
 
   if (!hydrated)
     return (
@@ -924,46 +991,123 @@ export function CrosswordPlay() {
                 · Para revisar conteúdos já trabalhados em sala.
               </span>
             </h2>
-            <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
-              {chips.map((chip) => {
-                const on = chip.id === puzzleId && !editing;
-                return (
-                  <div
-                    key={chip.id}
-                    className="flex shrink-0 items-center gap-1 rounded-full bg-paper-deep p-1"
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <label className="relative block min-w-0">
+                <span className="sr-only">Buscar atividades por título ou tema</span>
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft"
+                  aria-hidden
+                />
+                <input
+                  className="share-field pl-10"
+                  type="search"
+                  value={gallerySearch}
+                  onChange={(event) => setGallerySearch(event.target.value)}
+                  placeholder="Buscar por título ou tema"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar atividades">
+                {(
+                  [
+                    { id: "all", label: "Todas" },
+                    { id: "examples", label: "Exemplos" },
+                    { id: "created", label: teacher ? "Minhas atividades" : "Publicadas" },
+                  ] as const
+                ).map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    aria-pressed={galleryFilter === filter.id}
+                    onClick={() => setGalleryFilter(filter.id)}
+                    className={
+                      galleryFilter === filter.id
+                        ? "min-h-11 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
+                        : "min-h-11 rounded-full bg-paper-deep px-4 text-sm font-semibold text-ink hover:bg-line"
+                    }
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPuzzleId(chip.id);
-                        setEditing(false);
-                        setCreating(false);
-                      }}
-                      className={
-                        on
-                          ? "min-h-10 rounded-full bg-ink px-4 text-sm font-semibold text-paper"
-                          : "min-h-10 rounded-full px-4 text-sm font-semibold text-ink"
-                      }
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-sm text-ink-soft" aria-live="polite">
+              {visibleCards.length} {visibleCards.length === 1 ? "atividade" : "atividades"}
+            </p>
+            {visibleCards.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleCards.map((card) => {
+                  const selectedCard = card.id === puzzleId && !editing;
+                  const canDelete =
+                    teacher &&
+                    gallery.some((item) => item.id === card.id) &&
+                    (!card.id.startsWith("public-") || curatorAccess);
+                  const kindLabel =
+                    card.kind === "example"
+                      ? "Exemplo"
+                      : card.kind === "permanent"
+                        ? "Publicada na galeria"
+                        : card.kind === "local"
+                          ? "Neste navegador"
+                          : "Rascunho";
+                  return (
+                    <article
+                      key={card.id}
+                      className={`flex min-w-0 flex-col rounded-xl border bg-paper transition-[border-color,background-color] duration-150 ${
+                        selectedCard ? "border-2 border-brass bg-paper-deep" : "border-line"
+                      }`}
                     >
-                      {chip.label}
-                    </button>
-                    {teacher &&
-                    gallery.some((item) => item.id === chip.id) &&
-                    (!chip.id.startsWith("public-") || curatorAccess) ? (
                       <button
                         type="button"
-                        aria-label={`Excluir ${chip.label} da galeria`}
-                        title="Excluir da galeria"
-                        onClick={() => deleteFromGallery(chip.id)}
-                        className="min-h-10 rounded-full px-3 text-sm font-semibold text-ink hover:bg-paper"
+                        aria-pressed={selectedCard}
+                        onClick={() => {
+                          setPuzzleId(card.id);
+                          setEditing(false);
+                          setCreating(false);
+                        }}
+                        className="flex min-h-40 flex-1 flex-col items-start rounded-xl p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass"
                       >
-                        Excluir
+                        <span className="flex w-full items-center justify-between gap-2 text-xs font-semibold tracking-wide text-brass-deep uppercase">
+                          {kindLabel}
+                          {selectedCard ? (
+                            <span className="rounded-full bg-ink px-2 py-1 text-xs text-paper normal-case">
+                              Selecionada
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-3 line-clamp-2 font-display text-xl font-medium text-ink">
+                          {card.title}
+                        </span>
+                        <span className="mt-2 line-clamp-2 min-h-10 text-sm text-ink-soft">
+                          {card.note || "Atividade de revisão"}
+                        </span>
+                        <span className="mt-3 text-xs text-ink-soft">
+                          {card.wordCount} {card.wordCount === 1 ? "pista" : "pistas"}
+                        </span>
+                        <span className="mt-auto inline-flex min-h-11 items-center gap-2 pt-3 text-sm font-semibold text-ink">
+                          {selectedCard ? "Atividade aberta" : "Abrir atividade"}
+                          <ArrowRight className="size-4" aria-hidden />
+                        </span>
                       </button>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+                      {canDelete ? (
+                        <div className="border-t border-line px-4 py-2">
+                          <button
+                            type="button"
+                            onClick={() => void deleteFromGallery(card.id)}
+                            className="min-h-10 text-sm font-medium text-miss hover:underline"
+                          >
+                            Excluir da galeria
+                          </button>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-line bg-paper-deep p-5 text-sm text-ink-soft">
+                Nenhuma atividade encontrada. Tente outro termo ou escolha outro filtro.
+              </p>
+            )}
           </section>
         ) : null}
 
