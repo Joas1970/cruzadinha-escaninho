@@ -102,7 +102,7 @@ export function submissionText(submission: ActivitySubmission) {
     return entries.length
       ? [title, ...entries.flatMap((item) => [
           `${item.number}. ${item.clue}`,
-          `Resposta: ${/^_+$/.test(item.answer) ? "(nÃ£o preenchida)" : item.answer.replace(/_/g, "□")}`,
+          `Resposta: ${/^_+$/.test(item.answer) ? "(n\u00e3o preenchida)" : item.answer.replace(/_/g, "□")}`,
           "",
         ])]
       : [];
@@ -110,8 +110,8 @@ export function submissionText(submission: ActivitySubmission) {
   return [
     "ATIVIDADE DE PALAVRAS CRUZADAS",
     `Atividade: ${submission.title}`,
-    `Nome: ${submission.student || "(nÃ£o informado)"}`,
-    `Turma: ${submission.classroom || "(nÃ£o informada)"}`,
+    `Nome: ${submission.student || "(n\u00e3o informado)"}`,
+    `Turma: ${submission.classroom || "(n\u00e3o informada)"}`,
     `Palavras preenchidas: ${submission.completeCount} de ${submission.totalCount}`,
     "",
     ...section("across", "HORIZONTAIS"),

@@ -89,6 +89,7 @@
 .share-presentation { width: min(1280px, calc(100% - 24px)); padding: 32px; }
 .share-presentation .share-qr { max-width: 480px; }
 .submission-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: 28px; }
+.submission-identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
 .submission-qr-panel, .submission-file-panel { min-width: 0; }
 .submission-qr { margin-top: 12px; }
 .submission-qr svg { width: min(100%, 280px); margin: 0 auto; }
@@ -112,6 +113,7 @@
   .share-body { grid-template-columns: minmax(0, 1fr); }
   .share-dialog, .share-presentation { padding: 20px; }
   .submission-options { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .submission-identity { grid-template-columns: minmax(0, 1fr); }
   .submission-meta { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media print { .share-backdrop, .share-dialog { display: none !important; } }

@@ -775,7 +775,7 @@ export function CrosswordPlay() {
             ) : null}
             {!teacher ? (
               <p className="w-full text-xs text-ink-soft">
-                O arquivo inclui nome, turma e respostas. No menu do celular, escolha Bluetooth ou
+                Confirme nome e turma no envio. O menu do celular pode oferecer Bluetooth ou
                 Quick Share, se disponíveis.
               </p>
             ) : null}
