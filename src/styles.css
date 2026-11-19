@@ -88,11 +88,46 @@
 .share-field { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--color-line); border-radius: 6px; background: var(--color-paper-deep); color: var(--color-ink); padding: 10px; font-size: 14px; font-weight: 400; }
 .share-presentation { width: min(1280px, calc(100% - 24px)); padding: 32px; }
 .share-presentation .share-qr { max-width: 480px; }
+.submission-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); gap: 28px; }
+.submission-qr-panel, .submission-file-panel { min-width: 0; }
+.submission-qr { margin-top: 12px; }
+.submission-qr svg { width: min(100%, 280px); margin: 0 auto; }
+.submission-dialog .tool-button { width: fit-content; }
+.submission-page { min-height: 100dvh; padding: 24px 16px; background: #fff; color: #24211d; color-scheme: light; }
+.submission-paper { max-width: 780px; margin: 0 auto; padding: clamp(20px, 5vw, 48px); background: #fff; color: #24211d; }
+.submission-kicker { margin: 0 0 10px; color: #6f5a34; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.submission-paper h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.75rem, 5vw, 2.7rem); line-height: 1.15; }
+.submission-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0 30px; padding: 16px 0; border-top: 1px solid #ded8ce; border-bottom: 1px solid #ded8ce; }
+.submission-meta div { min-width: 0; }
+.submission-meta dt { color: #625b52; font-size: 0.8rem; }
+.submission-meta dd { margin: 4px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.submission-section { margin-top: 24px; }
+.submission-section h2 { margin: 0 0 12px; font-family: var(--font-display); font-size: 1.5rem; }
+.submission-section ol { display: grid; gap: 14px; margin: 0; padding-left: 1.5rem; }
+.submission-section li { break-inside: avoid; padding-left: 4px; }
+.submission-section li p { margin: 0 0 4px; }
+.submission-section li strong { font-size: 0.95rem; }
+.submission-footer { margin-top: 32px; border-top: 1px solid #ded8ce; padding-top: 12px; color: #625b52; font-size: 0.8rem; }
 @media (max-width: 640px) {
   .share-body { grid-template-columns: minmax(0, 1fr); }
   .share-dialog, .share-presentation { padding: 20px; }
+  .submission-options { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .submission-meta { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media print { .share-backdrop, .share-dialog { display: none !important; } }
+
+@media print {
+  body[data-print="submission"] * { visibility: hidden !important; }
+  body[data-print="submission"] .submission-page,
+  body[data-print="submission"] .submission-page * { visibility: visible !important; }
+  body[data-print="submission"] { margin: 0; background: #fff !important; color: #24211d !important; }
+  body[data-print="submission"] .submission-page { position: absolute; inset: 0; min-height: 0; padding: 0; background: #fff !important; }
+  .submission-paper { max-width: none; padding: 0; }
+  .submission-no-print { display: none !important; }
+  .submission-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .submission-section { break-inside: avoid; }
+  @page { margin: 16mm; }
+}
 
 button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
   outline: 2px solid var(--color-brass-deep);
